@@ -1,1 +1,1 @@
-# scc-hosting-standards
+# ssc-hosting-standards
