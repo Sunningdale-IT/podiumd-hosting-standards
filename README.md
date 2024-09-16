@@ -1,1 +1,1 @@
-# podiumd-hosting-standards
+# PodiumD hosting standards
