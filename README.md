@@ -1,1 +1,1 @@
-# ssc-hosting-standards
+# podiumd-hosting-standards
