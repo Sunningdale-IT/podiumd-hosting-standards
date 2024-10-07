@@ -545,7 +545,7 @@ Applications MUST be accessible via:
 - kubernetes internal DNS naming: openzaak.podiumd.svc.cluster.local
 - relative path domain name: gemeente.nl/formulieren 
 
-More infomration cna be found here: https://dimpact.atlassian.net/wiki/spaces/PCP/pages/175865864/Toegang+API+s+via+verschillende+domeinnamen+waaronder+interne+toegang
+More information can be found here: https://dimpact.atlassian.net/wiki/spaces/PCP/pages/175865864/Toegang+API+s+via+verschillende+domeinnamen+waaronder+interne+toegang
 
 
 ## Deployment Verzoek
