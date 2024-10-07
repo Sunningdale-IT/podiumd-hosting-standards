@@ -534,6 +534,20 @@ minute, we recommend:
 
 - File storage type
 
+### DNS Naming Conventions
+
+Applications MUST support access from *ANY* URL simultaneously. There should be no restiction on changing application URLS at any point in time. If a gemeente decide to change the URL that citizens access the application from, this should not require any database updates. 
+
+Applications MUST be accessible via:
+
+- technical domains: app.test.gemeente.dimpact.nl
+- vanity name domains: burgerformulieren.gemeente.nl
+- kubernetes internal DNS naming: openzaak.podiumd.svc.cluster.local
+- relative path domain name: gemeente.nl/formulieren 
+
+More infomration cna be found here: https://dimpact.atlassian.net/wiki/spaces/PCP/pages/175865864/Toegang+API+s+via+verschillende+domeinnamen+waaronder+interne+toegang
+
+
 ## Deployment Verzoek
 
 Deployment requests take the form of a “Deployment Verzoek”, a form
