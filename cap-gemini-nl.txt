@@ -1,0 +1,126 @@
+Context
+
+Op basis van de Betrouwbaarheidspijler van het Azure Well-Architected Framework moeten we de verschillende operationele toestanden van onze systemen en componenten duidelijk definiëren en documenteren. Dit is essentieel voor juiste monitoring, geautomatiseerde responses, gezondheidscontroles en incident management.
+
+Score: 41/200 (onvoldoende) - Hoogste prioriteit voor verbetering.
+
+Doelstellingen
+
+Documenteer Systeemtoestanden: Definieer duidelijke operationele toestanden voor alle systeemcomponenten
+
+Standaardiseer Gezondheidsdefinities: Stel vast wat "gezond", "gedegradeerd" en "gefaald" betekent voor elke service
+
+Verbeter Monitoring: Betere observabiliteit door goed gedefinieerde toestandsmonitoring
+
+Automatisering: Geautomatiseerde systemen laten gefundeerde beslissingen nemen op basis van duidelijke toestanden
+
+Incident Response: Duidelijk begrip van systeemstatus tijdens storingen
+
+Belangrijkste Verbetergebieden (uit Capgemini rapport)
+
+1. Definieer Staten
+
+Bouw een gezondheidsmodel om de verschillende staten van je workload te definiëren en te monitoren:
+
+Gezond/Normaal: Systeem werkt binnen verwachte parameters
+
+Gedegradeerd: Verminderde functionaliteit maar nog operationeel
+
+Gefaald/Ongezond: Systeem functioneert niet correct
+
+Onderhoud: Geplande downtime voor updates/reparaties
+
+Herstel: Systeem keert terug naar normale werking na incident
+
+2. Configureer Gezondheidsprobes
+
+Zodra de definitie van gezonde diensten is vastgesteld, moet dit worden weerspiegeld in de manier waarop gezondheidsprobes zijn geconfigureerd in Kubernetes:
+
+Liveness Probes: Controleren of container nog draait
+
+Readiness Probes: Controleren of service klaar is voor traffic
+
+Startup Probes: Voor langzaam startende containers
+
+3. Redundantie en Fouttolerantie
+
+Implementeer redundantie in je ontwerp om te voldoen aan betrouwbaarheidseisen:
+
+Multi-zone deployments: Verdeling over Azure Availability Zones
+
+Retry-mechanismen: Ingebouwde retry-logica voor tijdelijke fouten
+
+Circuit Breaker: Vermijd onnodige vertragingen bij persistente fouten
+
+Load Balancing: Verdeel traffic over meerdere instances
+
+4. Alerts bij Kritieke Drempels
+
+Stel alerts in voor kritieke drempels om proactief problemen aan te pakken:
+
+Resource Usage: CPU, Memory, Disk alerts
+
+Response Times: Latency monitoring
+
+Error Rates: Foutpercentages per service
+
+Availability: Uptime monitoring
+
+5. Ramp Herstel Oefeningen
+
+Plan en voer regelmatig rampherstel oefeningen uit:
+
+Disaster Recovery Plans: Gedocumenteerde herstelplannen
+
+Backup Testing: Regelmatige backup verificatie
+
+Chaos Engineering: Gecontroleerde failure testing
+
+Recovery Time Testing: RTO en RPO validatie
+
+Deliverables
+
+Toestandsdefinitie Documentatie: Uitgebreide documentatie van alle mogelijke toestanden
+
+Health Check Standaarden: Gestandaardiseerde health check implementaties
+
+Monitoring Configuratie: Bijgewerkte monitoring die gedefinieerde toestanden weergeeft
+
+Probe Implementatie: Review en verbetering van bestaande Kubernetes probes
+
+Alerting Regels: Configureer alerts gebaseerd op toestandsovergangen
+
+Succes Criteria
+
+Alle services hebben duidelijk gedefinieerde operationele toestanden
+
+Health checks geven accuraat de servicestatus weer
+
+Monitoring dashboards tonen duidelijke systeemstatus
+
+Geautomatiseerde responses werken betrouwbaar op basis van gedefinieerde toestanden
+
+Incident response tijden verbeteren door duidelijkere systeemvisibiliteit
+
+Doel: Score verbeteren van 41/200 naar minimaal 120/200
+
+Volgende Stappen
+
+Audit huidige health probes en monitoring
+
+Definieer standaard toestandsmodellen voor onze architectuur
+
+Implementeer verbeterde health checks
+
+Update monitoring en alerting
+
+Documenteer operationele procedures gebaseerd op toestanden
+
+Referenties
+
+Azure Well-Architected Framework - Reliability
+
+Kubernetes Health Checks
+
+Capgemini PodiumD Assessment Rapport - Betrouwbaarheidsanalyse
+
