@@ -353,7 +353,8 @@ Final functional configuration "inside" the application is out of scope.
 
 Based on the Azure Well-Architected Framework, applications **MUST** be designed to handle failures gracefully and maintain availability.
 
-- [COMP009A.1-multi-zone] **Multi-Zone Deployments**: Applications **SHOULD** support deployment across Azure Availability Zones
+- [COMP009A.1-multi-zone] **Multi-Zone Deployments**: Production applications **SHOULD** support deployment across Azure Availability Zones
+  - **MUST** be implemented for critical/high-availability applications
   - Pod anti-affinity rules to spread replicas across zones
   - Topology spread constraints for even distribution
   - Zone-aware persistent storage when needed
@@ -366,7 +367,7 @@ Based on the Azure Well-Architected Framework, applications **MUST** be designed
   - Retry only idempotent operations or use idempotency keys
   - Log retry attempts for debugging
   
-- [COMP009A.3-circuit-breaker] **Circuit Breaker Pattern**: Applications **SHOULD** implement circuit breakers for external dependencies
+- [COMP009A.3-circuit-breaker] **Circuit Breaker Pattern**: Applications with external dependencies **MUST** implement circuit breakers
   - Prevent cascading failures from slow/failing dependencies
   - Three states: Closed (normal), Open (failing), Half-Open (testing recovery)
   - Configurable failure threshold (e.g., 50% errors over 10 requests)
@@ -514,7 +515,7 @@ Reference: [Azure Well-Architected Framework - Reliability](https://learn.micros
 Applications **MUST** provide probe endpoints for Kubernetes health management that accurately reflect the system states defined above.
 
 - [COMP014A.1-liveness] **Liveness probe**: Indicates if application is running (maps to Healthy vs Failed states)
-  - Should check critical internal components only
+  - **SHOULD** check critical internal components only
   - **MUST NOT** fail due to external dependency issues
   - Failure triggers container restart
   - Recommended endpoint: `/health/live` or `/healthz`
