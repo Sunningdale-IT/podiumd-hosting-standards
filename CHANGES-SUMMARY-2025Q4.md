@@ -1,386 +1,814 @@
-# Summary of Changes: Hosting Contract 2025Q4
+# Summary of Changes: Hosting Contract 2024Q3 to 2025Q4
 
-## Document Information
-- **Source Document**: hosting-contract-2024Q3.md
-- **Target Document**: hosting-contract-2025Q4.md
-- **Update Date**: October 27, 2024
-- **Primary References**: 
-  - Capgemini PodiumD Assessment Report (cap-gemini-nl.txt)
-  - Microsoft Azure Well-Architected Framework
-  - Google SRE Documentation
-  - Industry Best Practices for Kubernetes Hosting
+**Document Version:** 2025Q4  
+**Date:** October 27, 2024  
+**Author:** Jim Leitch  
+**Based on:** Microsoft Well-Architected Framework, Google SRE documentation, Cap Gemini PodiumD Assessment
 
 ## Executive Summary
 
-This update transforms the hosting contract from a basic infrastructure requirements document into a comprehensive SRE/DevOps best practices guide. The changes incorporate recommendations from the Capgemini assessment (which scored the current reliability at 41/200) and align with industry standards from Microsoft and Google.
+This document summarizes the comprehensive updates made to the PodiumD Hosting Standards document, transitioning from version 2024Q3 to 2025Q4. The updates incorporate best practices from:
 
-## Major Additions and Changes
+1. **Microsoft Azure Well-Architected Framework** - Particularly the Reliability pillar
+2. **Google Site Reliability Engineering (SRE) documentation** - Focusing on monitoring, metrics, and operational excellence
+3. **Cap Gemini Assessment Report** - Addressing the reliability score of 41/200 and specific recommendations
+4. **Industry Best Practices** - Current standards for Kubernetes, microservices, and cloud-native applications (2024-2025)
+
+The primary goal is to improve the reliability, observability, maintainability, and operational efficiency of the PodiumD platform while ensuring smooth integration of components from multiple suppliers.
+
+---
+
+## Major Additions and Enhancements
 
 ### 1. Service Naming Conventions [COMP001-naming] - ENHANCED
 
-**Why**: The Capgemini report emphasized the need for consistency in multi-tenant environments. Industry best practices require DNS-compliant naming.
-
-**What Changed**:
-- Added explicit DNS label standards (RFC 1123 compliance)
-- Defined service naming patterns for consistency
-- Added Kubernetes DNS naming format documentation: `{service-name}.{namespace}.svc.cluster.local`
-- Included multi-tenant naming considerations
-- Added labeling requirements for tenant tracking
-
-**Impact**: Ensures consistency across all components, enables automation, and prevents naming collisions in multi-tenant deployments.
-
-### 2. Deployment Time Requirements [COMP007.7-deployment-time] - NEW
-
-**Why**: The issue specifically requested that upgrades should never last more than 15 minutes. This aligns with SRE best practices for minimal disruption windows.
-
-**What Added**:
-- Hard requirement: Component upgrades MUST complete within 15 minutes
-- Breakdown of what's included in the 15-minute window:
-  - Container pull time
-  - Application startup time
-  - Readiness probe success
-  - Traffic migration
-- Requirement for architectural review if consistently exceeded
-
-**Impact**: Sets clear expectations for deployment performance, enabling better capacity planning and ensuring minimal service disruption.
-
-### 3. Zero-Downtime Deployment Strategy [COMP007.6-rolling-updates] - ENHANCED
-
-**Why**: Modern Kubernetes applications must support continuous availability. The previous contract allowed waivers; the new standard makes this mandatory.
-
-**What Changed**:
-- Changed from "SHOULD be performed as rolling update" to "MUST be performed as rolling update with zero downtime"
-- Added specific configuration: `maxUnavailable: 0` and `maxSurge: 1` or higher
-- Removed waiver clause for database changes (these must now also be zero-downtime)
-
-**Impact**: Eliminates planned downtime for deployments, improving overall system availability.
-
-### 4. Version Information Endpoint [COMP019-version-endpoint] - NEW
-
-**Why**: The issue specifically requested "each app should have an API where the version of the app/component can be easily read out." This is essential for operational visibility and troubleshooting.
-
-**What Added**:
-- Mandatory `/version` or `/api/version` endpoint
-- Structured JSON response format with:
-  - Semantic version number
-  - Build/commit information
-  - Build timestamp
-  - Optional dependency versions
-- Requirement for unauthenticated access (operational tool)
-- Clear separation: version endpoint is NOT for health checks
-
-**Impact**: Enables automated version discovery, improves troubleshooting, and supports compliance tracking across deployments.
-
-### 5. Health State Definitions [COMP014-healthchecks] - SIGNIFICANTLY ENHANCED
-
-**Why**: This directly addresses the Capgemini report's highest priority recommendation (score 41/200 for reliability). The report emphasized: "We must clearly define and document the different operational states of our systems."
-
-**What Added**:
-- Five operational states defined based on Azure Well-Architected Framework:
-  1. **Healthy/Normal State** - Full operation
-  2. **Degraded State** - Reduced functionality but operational
-  3. **Failed/Unhealthy State** - Cannot function correctly
-  4. **Maintenance State** - Planned downtime
-  5. **Recovery State** - Returning to normal after incident
-
-- Enhanced probe configuration requirements:
-  - Liveness vs Readiness probe distinctions clarified
-  - What each probe should/shouldn't check
-  - When failures should trigger restarts vs traffic removal
-  - Startup probe guidance for slow-starting apps
-
-- Health check endpoint standards:
-  - Lightweight and fast (< 1 second)
-  - Structured JSON responses with status and dependency checks
-  - Example response format provided
-
-**Impact**: Dramatically improves monitoring accuracy, enables automated responses, and provides clarity for incident management. This directly addresses the Capgemini report's primary concern.
-
-### 6. Service Level Objectives (SLOs) and Indicators (SLIs) [COMP020-slo-sli] - NEW
-
-**Why**: Google SRE best practices emphasize SLOs as fundamental to reliability engineering. The issue requested alignment with "Google SRE documentation."
-
-**What Added**:
-- Definition and requirement for SLIs (measurable service health):
-  - Availability (99.9%+ target)
-  - Latency (95th percentile thresholds)
-  - Error Rate (< 0.1% target)
-  - Throughput capacity
-
-- SLO documentation requirements:
-  - Explicit targets for critical user journeys
-  - Error budget concepts
-  - Balance between reliability and feature velocity
-
-- Example SLO documentation format provided
-
-- Monitoring requirements:
-  - Prometheus format metrics
-  - Request counters, latency histograms, error counters
-  - Proper labeling (endpoint, method, status)
-
-**Impact**: Provides measurable reliability targets, enables data-driven decision making, and aligns with industry-leading SRE practices.
-
-### 7. Redundancy and Fault Tolerance [COMP021-redundancy] - NEW
-
-**Why**: Capgemini report recommendation #3 emphasized implementing redundancy to meet reliability requirements.
-
-**What Added**:
-- Multi-zone deployment requirements:
-  - Distribution across Azure Availability Zones
-  - Pod anti-affinity rules
-  - Minimum 3 replicas for critical services
-
-- Retry mechanisms:
-  - Exponential backoff for transient failures
-  - Appropriate timeout values
-  - Cascading failure prevention
-
-- Circuit breaker pattern:
-  - For external service calls
-  - Graceful degradation
-  - Prevent unnecessary delays
-
-- Load balancing requirements:
-  - Stateless design for effective distribution
-  - Minimize session affinity
-
-**Impact**: Increases system resilience, reduces outage impact, and ensures business continuity.
-
-### 8. Alerting and Critical Thresholds [COMP022-alerting] - NEW
-
-**Why**: Capgemini report recommendation #4 emphasized setting alerts for critical thresholds to proactively address problems.
-
-**What Added**:
-- Resource usage alert thresholds:
-  - CPU > 80% for 5 minutes
-  - Memory > 85% for 5 minutes
-  - Disk > 80%
-
-- Performance alerts:
-  - SLO threshold violations
-  - Latency and error rate alerts
-  - Availability monitoring
-
-- Application-specific alerts:
-  - Queue depth
-  - Connection pool exhaustion
-  - Dependency failures
-  - Background job failures
-
-- Alert best practices:
-  - Must be actionable
-  - Include context
-  - Avoid alert fatigue
-
-**Impact**: Enables proactive problem detection, reduces mean time to detection (MTTD), and improves operational response.
-
-### 9. Disaster Recovery [COMP023-disaster-recovery] - NEW
-
-**Why**: Capgemini report recommendation #5 emphasized planning and executing regular disaster recovery exercises.
-
-**What Added**:
-- Backup requirements:
-  - Document data backup needs
-  - Define RPO (Recovery Point Objective)
-  - Define RTO (Recovery Time Objective)
-
-- Recovery procedures:
-  - Step-by-step documentation
-  - Quarterly testing requirement
-  - Runbooks for common failures
-
-- Chaos engineering:
-  - Test failure scenarios
-  - Non-production testing
-  - Validate fault tolerance
-
-**Impact**: Ensures preparedness for disasters, reduces recovery time, and validates resilience mechanisms.
-
-### 10. Infrastructure Enhancements
-
-**Why**: Align with Microsoft Azure Well-Architected Framework recommendations for high availability.
-
-**What Added**:
-- Availability Zones requirement for AKS clusters
-- Multi-zone deployment emphasis throughout document
-- Regional redundancy considerations
-
-**Impact**: Improves infrastructure resilience and reduces blast radius of failures.
-
-### 11. Resource Requirements Enhancement [COMP017-resource-recommendations]
-
-**Why**: Proper resource allocation is essential for stability and cost optimization.
-
-**What Enhanced**:
-- Added requirement for both `requests` and `limits`
-- Guideline: limits should be 1.5-2x requests for burst capacity
-- Requirement for different load profiles (low, medium, high)
-
-**Impact**: Better resource planning, improved cost management, and prevention of resource contention.
-
-### 12. Release Notes Enhancement [COMP018-release-notes]
-
-**Why**: Operational teams need comprehensive information for safe deployments.
-
-**What Added to Required Information**:
-- Breaking changes and migration procedures
-- Performance impact of changes
-- Security fixes included in release
-
-**Impact**: Reduces deployment risks and improves change management.
-
-### 13. Well-Architected Framework Alignment Section - NEW
-
-**Why**: The issue specifically requested "make recommendations according to microsoft well architected framework standards."
-
-**What Added**:
-- New section mapping requirements to the five WAF pillars:
-  1. **Reliability**: Multi-zone, health states, SLOs, disaster recovery
-  2. **Security**: Scanning, secrets, network isolation, identity
-  3. **Cost Optimization**: Right-sizing, quotas, scheduling
-  4. **Operational Excellence**: Automation, logging, alerting, versioning
-  5. **Performance Efficiency**: Scaling, resources, monitoring, load balancing
-
-**Impact**: Demonstrates comprehensive alignment with Microsoft's cloud architecture standards and provides framework for continuous improvement.
-
-### 14. Enhanced References Section
-
-**Why**: Provide suppliers with authoritative sources for best practices.
-
-**What Added**:
-- Google SRE Book links (Service Level Objectives)
-- Google SRE Workbook (Implementing SLOs)
-- Microsoft Azure Well-Architected Framework
-- Azure AKS Best Practices
-- Kubernetes DNS documentation
-
-**Impact**: Enables suppliers to deep-dive into topics and understand the rationale behind requirements.
-
-## Changes by Compliance Code
-
-### New Compliance Codes
-- **COMP019-version-endpoint**: Version information API requirement
-- **COMP020-slo-sli**: Service Level Objectives and Indicators
-- **COMP021-redundancy**: Redundancy and fault tolerance requirements
-- **COMP022-alerting**: Alerting and critical thresholds
-- **COMP023-disaster-recovery**: Disaster recovery procedures
-
-### Enhanced Compliance Codes
-- **COMP001-naming**: Added DNS standards, Kubernetes naming, multi-tenant guidance
-- **COMP007.6-rolling-updates**: Changed from SHOULD to MUST, added specific configuration
-- **COMP007.7-deployment-time**: New requirement for 15-minute deployment window
-- **COMP014-healthchecks**: Comprehensive health state definitions and probe requirements
-- **COMP017-resource-recommendations**: Added requests/limits guidance and load profiles
-- **COMP018-release-notes**: Added breaking changes, performance impact, security fixes
-
-## Integration of Capgemini Recommendations
-
-The Capgemini report (cap-gemini-nl.txt) provided a reliability assessment score of **41/200** and identified five critical areas for improvement. Here's how each was addressed:
-
-### Capgemini Priority #1: Define System States (Score: 41/200)
-**Addressed by**: COMP014-healthchecks enhancement
-- Added five operational states (Healthy, Degraded, Failed, Maintenance, Recovery)
-- Defined probe configuration requirements
-- Provided health check endpoint standards
-**Target**: Improve score to minimum 120/200
-
-### Capgemini Priority #2: Configure Health Probes
-**Addressed by**: COMP014-healthchecks enhancement
-- Liveness vs Readiness probe distinctions
-- Startup probe guidance
-- Dependency checking recommendations
-
-### Capgemini Priority #3: Redundancy and Fault Tolerance
-**Addressed by**: COMP021-redundancy (NEW)
-- Multi-zone deployment requirements
-- Retry mechanisms
+**What Changed:**
+- Added comprehensive service naming standards with specific patterns
+- Introduced consistent naming across all artifacts (services, containers, helm charts, namespaces)
+- Added examples of good vs. bad naming practices
+
+**Why:**
+The original document mentioned naming conventions but didn't provide specific guidance. The new standards ensure:
+- **Consistency**: All teams use the same naming patterns
+- **Clarity**: Service names reflect their business domain and function
+- **Maintainability**: Easy to identify and manage services across environments
+- **Automation**: Predictable names enable better automation
+
+**Based on:**
+- Industry best practices for microservices naming
+- GeeksforGeeks recommendations on microservices naming
+- Microsoft Azure naming conventions
+
+**Example:**
+```
+Pattern: {domain}-{function}-service
+Good: klant-management-service, zaak-api-service
+Avoid: service1, api, app-x
+```
+
+---
+
+### 2. Version API Endpoint [COMP002.1-version-api] - NEW REQUIREMENT
+
+**What Changed:**
+- **NEW**: Every component must expose a standardized `/api/v1/version` endpoint
+- Endpoint must return JSON with version, build date, git commit, and dependencies
+- Must be accessible without authentication
+
+**Why:**
+- **Operational Visibility**: Quickly identify which version is running in any environment
+- **Troubleshooting**: Rapidly diagnose version-related issues
+- **Automation**: Enable automated version checking and compliance monitoring
+- **Integration**: Other components can verify compatibility
+- **Audit**: Track exactly what's running where
+
+**Based on:**
+- Common industry practice for cloud-native applications
+- DevOps best practices for version management
+- Request from issue to "have an API where the version can be easily read out"
+
+**Example Response:**
+```json
+{
+  "name": "zaak-api-service",
+  "version": "2.5.1",
+  "buildDate": "2024-10-15T14:30:00Z",
+  "gitCommit": "a3f2d1c",
+  "dependencies": {
+    "postgres": "14.5",
+    "redis": "7.0.5"
+  }
+}
+```
+
+---
+
+### 3. Component Upgrade Time Limits [COMP006.2-upgrade-time-limit] - NEW REQUIREMENT
+
+**What Changed:**
+- **NEW**: Maximum 15-minute upgrade time limit for any component
+- Includes specific guidance on what counts toward this limit
+- Provides strategies for meeting the requirement
+- Exceptions documented for long-running database migrations
+
+**Why:**
+- **User Experience**: Minimizes service disruption
+- **Predictability**: Teams can plan upgrade windows confidently
+- **Architectural Quality**: Forces good design (stateless, scalable)
+- **Business Continuity**: Reduces risk of extended outages
+- **Addresses Issue**: Direct requirement from the problem statement
+
+**Based on:**
+- Issue requirement: "any upgrade should never last more than 15 minutes"
+- Industry best practices for zero-downtime deployments
+- Google SRE principles on change management
+
+**Strategies Provided:**
+- Rolling updates with readiness probes
+- Blue/green deployments for major changes
+- Separate database migration jobs
+- Backward-compatible schema changes
+- Feature flags for gradual activation
+
+---
+
+### 4. Enhanced Health Check Requirements [COMP014.1-health-states] - NEW & ENHANCED
+
+**What Changed:**
+- **NEW**: Detailed health state definitions (Healthy, Degraded, Unhealthy, Starting, Stopping)
+- **ENHANCED**: Comprehensive probe configuration guidance
+- **NEW**: Multi-zone deployment requirements
+- **NEW**: Pod Disruption Budget requirements
+
+**Why:**
+This directly addresses the **Cap Gemini assessment** which identified system state definition as the **highest priority improvement** (score: 41/200).
+
+Key improvements:
+- **Clear State Definitions**: Everyone understands what "healthy" means
+- **Better Monitoring**: Accurate health status enables better automation
+- **Automated Response**: Systems can react appropriately to state changes
+- **Incident Management**: Faster diagnosis during outages
+- **Reliability**: Prevents cascading failures from improper health checks
+
+**Based on:**
+- Cap Gemini report: "Definieer Staten" (Define States) - highest priority
+- Azure Well-Architected Framework: Reliability pillar
+- Kubernetes best practices for probes
+
+**New State Definitions:**
+1. **Healthy**: All dependencies available, within SLA
+2. **Degraded**: Reduced functionality, some non-critical deps unavailable
+3. **Unhealthy**: Critical failure, cannot process requests
+4. **Starting**: Initializing, not ready for traffic
+5. **Stopping**: Graceful shutdown in progress
+
+**Probe Configuration Details:**
+- **Liveness**: Simple, fast checks (< 1 second)
+- **Readiness**: Check critical dependencies
+- **Startup**: For slow-starting apps, prevents premature restarts
+- Specific guidance on thresholds, periods, and timeouts
+
+---
+
+### 5. Redundancy and Fault Tolerance [COMP014.3-redundancy] - NEW
+
+**What Changed:**
+- **NEW**: Multi-zone deployment requirements
+- **NEW**: Retry mechanism requirements
+- **NEW**: Load balancing requirements
+- **NEW**: Pod Disruption Budget requirements
+
+**Why:**
+Directly addresses Cap Gemini recommendations on "Redundantie en Fouttolerantie":
+- **High Availability**: Services survive zone failures
+- **Resilience**: Automatic recovery from transient failures
+- **Business Continuity**: No single point of failure
+- **SLA Compliance**: Meet availability targets
+
+**Based on:**
+- Cap Gemini report: Section 3 - Redundancy and Fault Tolerance
+- Azure Well-Architected Framework: Availability Zones
+- Google SRE: Redundancy and failure domains
+
+**Requirements:**
+- Minimum 3 replicas for critical services
+- Spread across multiple Azure Availability Zones
+- Exponential backoff retry logic
 - Circuit breaker patterns
+- Pod Disruption Budgets to protect during updates
+
+---
+
+### 6. Golden Signals Metrics [COMP017-golden-signals] - NEW & ENHANCED
+
+**What Changed:**
+- **RESTRUCTURED**: Metrics section reorganized around Google's "Four Golden Signals"
+- **NEW**: Specific metric requirements for Latency, Traffic, Errors, Saturation
+- **NEW**: Prometheus format requirements
+- **NEW**: Metric naming and labeling standards
+
+**Why:**
+Google SRE's Golden Signals are industry standard for monitoring distributed systems:
+- **Focus**: Monitor what matters for user experience
+- **Completeness**: Cover all critical aspects of service health
+- **Actionability**: Enable fast problem detection and diagnosis
+- **Standardization**: Common language across all services
+
+**Based on:**
+- Google SRE Book: "Monitoring Distributed Systems"
+- Industry standard for Kubernetes monitoring
+- Cap Gemini recommendations for improved monitoring
+
+**The Four Golden Signals:**
+
+1. **Latency [COMP017.1]**: Response time, separate success/error, percentiles
+2. **Traffic [COMP017.2]**: Requests/second, concurrent connections
+3. **Errors [COMP017.3]**: Error rate, types, failed transactions
+4. **Saturation [COMP017.4]**: Resource utilization, queue depth, pool usage
+
+**Implementation Requirements:**
+- Expose metrics at `/metrics` endpoint
+- Use Prometheus format
+- Include appropriate labels (environment, version, instance)
+- Minimal performance impact (< 1% overhead)
+
+---
+
+### 7. Alerting Best Practices [COMP018-alerting] - NEW
+
+**What Changed:**
+- **NEW**: Comprehensive alerting section based on Google SRE principles
+- **NEW**: Alert design principles
+- **NEW**: Severity levels (P1/P2/P3)
+- **NEW**: SLO-based alerting guidance
+- **NEW**: Alert fatigue prevention
+
+**Why:**
+Addresses Cap Gemini recommendation "Alerts bij Kritieke Drempels":
+- **Actionability**: Only alert when human intervention needed
+- **Reduced Noise**: Prevent alert fatigue
+- **Faster Response**: Clear severity and next steps
+- **SLO-Driven**: Tie alerts to business objectives
+
+**Based on:**
+- Google SRE: Alerting principles
+- Cap Gemini report: Section 4 - Alerts at Critical Thresholds
+- Industry best practices for on-call management
+
+**Key Principles:**
+- Alerts MUST be actionable
+- Every alert includes: what's broken, impact, next steps, runbook links
+- Three severity levels (Critical/Warning/Info)
+- SLO-based alerting using error budgets
+- Multi-window, multi-burn-rate alerts to prevent fatigue
+
+---
+
+### 8. Service Level Objectives (SLO) [COMP019-slo] - NEW
+
+**What Changed:**
+- **NEW**: Complete SLO section defining SLIs, SLOs, and error budgets
+- **NEW**: Requirements for each production service
+- **NEW**: Example SLOs and error budget calculations
+
+**Why:**
+SLOs are fundamental to SRE practice:
+- **Objective Reliability**: Quantify "how reliable is reliable enough"
+- **Balance Velocity vs. Reliability**: Use error budgets wisely
+- **Shared Understanding**: Clear targets for all stakeholders
+- **Incident Prioritization**: Focus on SLO-impacting issues
+
+**Based on:**
+- Google SRE Book: "Service Level Objectives"
+- Industry standard for production services
+- Microsoft Well-Architected Framework: Reliability targets
+
+**Requirements:**
+- Define SLIs (metrics): availability, latency, throughput, error rate
+- Set SLO targets: e.g., 99.9% availability = 43.2 min downtime/month
+- Calculate error budgets: Used to balance features vs. reliability
+- Review quarterly and track violations
+
+**Example:**
+```
+SLO: 99.9% availability over 30 days
+Error Budget: 0.1% = 43.2 minutes downtime/month
+If budget exhausted: Freeze features, focus on reliability
+```
+
+---
+
+### 9. Disaster Recovery [COMP021-disaster-recovery] - NEW
+
+**What Changed:**
+- **NEW**: Complete disaster recovery section
+- **NEW**: RTO (Recovery Time Objective) and RPO (Recovery Point Objective) requirements
+- **NEW**: Backup and restore requirements
+- **NEW**: DR testing requirements
+
+**Why:**
+Addresses Cap Gemini "Ramp Herstel Oefeningen":
+- **Business Continuity**: Prepare for worst-case scenarios
+- **Compliance**: Meet regulatory requirements
+- **Confidence**: Regular testing ensures procedures work
+- **Fast Recovery**: Documented procedures enable quick restoration
+
+**Based on:**
+- Cap Gemini report: Section 5 - Disaster Recovery Exercises
+- Azure Well-Architected Framework: Backup and DR
+- Industry best practices for business continuity
+
+**Requirements:**
+- Define RTO (max acceptable downtime)
+- Define RPO (max acceptable data loss)
+- Document backup strategy meeting RPO
+- Test restore procedures quarterly
+- Test DR annually
+- Document all procedures
+
+---
+
+### 10. Security Requirements [COMP023-security] - NEW
+
+**What Changed:**
+- **NEW**: Comprehensive security section covering:
+  - Container security (non-root, read-only filesystem, dropped capabilities)
+  - Network security (network policies, TLS)
+  - Secret management (Key Vault, rotation)
+  - SBOM (Software Bill of Materials)
+
+**Why:**
+- **Defense in Depth**: Multiple security layers
+- **Compliance**: Meet security standards and regulations
+- **Vulnerability Management**: Quick identification and remediation
+- **Best Practices**: Industry-standard container security
+
+**Based on:**
+- CIS Kubernetes Benchmark
+- Azure Well-Architected Framework: Security pillar
+- NIST container security guidelines
+- Cap Gemini security recommendations (implied from Bijlage3)
+
+**Key Requirements:**
+- Containers run as non-root user
+- Read-only root filesystem where possible
+- All capabilities dropped except necessary ones
+- Vulnerability scans before deployment
+- High/Critical CVEs fixed within 7 days
+- Network policies restrict pod-to-pod communication
+- All external communication uses TLS 1.2+
+
+---
+
+### 11. Integration and API Best Practices [COMP025-api-practices] - NEW
+
+**What Changed:**
+- **NEW**: API design standards section
+- **NEW**: RESTful principles
+- **NEW**: Versioning strategy
+- **NEW**: Error handling standards
+- **NEW**: Rate limiting guidance
+- **NEW**: OpenAPI/Swagger documentation requirement
+
+**Why:**
+- **Interoperability**: Services integrate smoothly
+- **Consistency**: All APIs follow same patterns
+- **Developer Experience**: Easy to understand and use
+- **Stability**: Versioning prevents breaking changes
+
+**Based on:**
+- Microsoft Azure API design best practices
+- RESTful API best practices
+- Issue requirement for smooth integration
+
+**Standards:**
+- Use standard HTTP methods correctly
+- Plural nouns for collections (`/users`)
+- Version in URL path (`/api/v1/resource`)
+- Consistent error format with codes and messages
+- Rate limiting with headers
+- OpenAPI/Swagger documentation mandatory
+
+---
+
+### 12. Service Mesh Considerations [COMP026-service-mesh] - NEW
+
+**What Changed:**
+- **NEW**: Service mesh guidance for complex environments
+- **NEW**: When to use service mesh (Istio, Linkerd)
+- **NEW**: How applications should integrate with mesh
+
+**Why:**
+- **Advanced Networking**: Mutual TLS, traffic routing, observability
+- **Simplified Apps**: Apps don't implement retry/circuit breaker logic
+- **Future-Proofing**: Prepare for service mesh adoption
+
+**Based on:**
+- Industry trends toward service mesh
+- Bijlage3 reference to integration components (API gateway, service mesh)
+- Google SRE and Microsoft recommendations
+
+**Guidance:**
+- Service mesh may be used for mTLS, traffic management, observability
+- If mesh is used: apps should not implement their own service discovery
+- Apps should expose metrics for mesh integration
+
+---
+
+### 13. Documentation Requirements [COMP027-documentation] - ENHANCED
+
+**What Changed:**
+- **ENHANCED**: Expanded from simple release notes to comprehensive documentation requirements
+- **NEW**: Five types of required documentation:
+  1. Architecture documentation
+  2. Deployment documentation
+  3. Operations documentation (runbooks)
+  4. API documentation
+  5. Security documentation
+
+**Why:**
+- **Knowledge Transfer**: Enable new team members
+- **Operational Excellence**: Clear runbooks reduce MTTR (Mean Time To Repair)
+- **Compliance**: Meet audit requirements
+- **Quality**: Well-documented systems are easier to maintain
+
+**Based on:**
+- Google SRE: Documentation culture
+- Microsoft Well-Architected Framework: Operational excellence
+- Industry best practices for technical documentation
+
+---
+
+### 14. Compliance and Audit [COMP028-compliance] - NEW
+
+**What Changed:**
+- **NEW**: Audit logging requirements
+- **NEW**: GDPR compliance requirements
+- **NEW**: Data retention and privacy requirements
+
+**Why:**
+- **Regulatory Compliance**: GDPR and other regulations
+- **Security**: Audit trails for incident investigation
+- **Privacy**: Respect user rights (erasure, portability)
+- **Accountability**: Track who did what when
+
+**Based on:**
+- GDPR requirements for personal data
+- Industry standards for audit logging
+- Dutch government compliance requirements
+
+---
+
+### 15. Performance Requirements [COMP029-performance] - NEW
+
+**What Changed:**
+- **NEW**: Specific performance targets
+- **NEW**: Caching strategy requirements
+- **NEW**: Load testing expectations
+
+**Why:**
+- **User Experience**: Fast responses improve satisfaction
+- **SLA Compliance**: Meet agreed performance levels
+- **Capacity Planning**: Know expected throughput
+- **Cost Optimization**: Efficient use of resources
+
+**Based on:**
+- Industry standards for web application performance
+- Google's performance recommendations
+- User experience research
+
+**Targets:**
+- Interactive requests: < 200ms (p95)
+- API calls: < 500ms (p95)
+- Database queries: < 100ms (p95)
+
+---
+
+### 16. Cost Optimization [COMP030-cost-optimization] - NEW
+
+**What Changed:**
+- **NEW**: Cost optimization section
+- **NEW**: Resource efficiency guidance
+- **NEW**: Cost visibility requirements
+
+**Why:**
+- **Budget Control**: Cloud costs can spiral without attention
+- **Sustainability**: Efficient resource use reduces environmental impact
+- **Value**: Maximize capability per euro spent
+
+**Based on:**
+- Azure Well-Architected Framework: Cost optimization pillar
+- FinOps best practices
+- Municipal budget constraints
+
+---
+
+## Changes Addressing Cap Gemini Assessment
+
+The Cap Gemini assessment identified several critical areas needing improvement. Here's how this update addresses each:
+
+### Cap Gemini Priority 1: System State Definitions (Score: 41/200)
+
+**Addressed by:**
+- [COMP014.1-health-states]: Complete health state definitions
+- [COMP014.2-probe-config]: Comprehensive probe configuration
+- Enhanced monitoring and alerting sections
+
+**Impact:**
+- Clear definition of Healthy, Degraded, Unhealthy, Starting, Stopping states
+- Proper probe configuration for accurate health reporting
+- Automated systems can make informed decisions based on state
+- Faster incident response through clear system visibility
+
+---
+
+### Cap Gemini Priority 2: Redundancy and Fault Tolerance
+
+**Addressed by:**
+- [COMP014.3-redundancy]: Multi-zone deployment requirements
+- [COMP014.4-pdb]: Pod Disruption Budget requirements
+- Retry mechanisms and circuit breakers
 - Load balancing requirements
 
-### Capgemini Priority #4: Alerts at Critical Thresholds
-**Addressed by**: COMP022-alerting (NEW)
-- Resource usage thresholds
-- Performance alerts
-- Application-specific alerts
-- Alert best practices
+**Impact:**
+- Services survive availability zone failures
+- Automatic recovery from transient failures
+- Graceful handling of updates and maintenance
+- Improved overall system reliability
 
-### Capgemini Priority #5: Disaster Recovery Exercises
-**Addressed by**: COMP023-disaster-recovery (NEW)
-- Backup requirements with RPO/RTO
-- Recovery procedure documentation
-- Quarterly testing requirement
-- Chaos engineering recommendations
+---
 
-## Benefits of the Updates
+### Cap Gemini Priority 3: Alerts at Critical Thresholds
+
+**Addressed by:**
+- [COMP018-alerting]: Comprehensive alerting section
+- [COMP018.1-slo-alerting]: SLO-based alerting
+- Golden Signals metrics for alerting thresholds
+- Alert fatigue prevention
+
+**Impact:**
+- Alerts only when human intervention needed
+- Clear severity levels and actionable information
+- Proactive problem detection before user impact
+- Reduced on-call burden through intelligent alerting
+
+---
+
+### Cap Gemini Priority 4: Disaster Recovery Exercises
+
+**Addressed by:**
+- [COMP021-disaster-recovery]: Complete DR section
+- RTO/RPO requirements
+- Backup and restore procedures
+- Regular DR testing requirements
+
+**Impact:**
+- Preparedness for disaster scenarios
+- Documented and tested recovery procedures
+- Confidence in ability to recover from failures
+- Compliance with business continuity requirements
+
+---
+
+## Changes Based on Microsoft Well-Architected Framework
+
+### Reliability Pillar
+
+**Implemented:**
+- Multi-zone deployments for high availability
+- Health check and probe best practices
+- Redundancy and fault tolerance requirements
+- Disaster recovery planning
+- Automated scaling and self-healing
+
+---
+
+### Security Pillar
+
+**Implemented:**
+- Container security hardening (non-root, read-only FS)
+- Network segmentation with network policies
+- Secret management with Azure Key Vault
+- TLS requirements for all external communication
+- Regular vulnerability scanning and patching
+
+---
+
+### Operational Excellence Pillar
+
+**Implemented:**
+- Comprehensive documentation requirements
+- Runbooks for common operations
+- Automated deployment and testing
+- Observability through logs, metrics, and traces
+- Regular DR and chaos testing
+
+---
+
+### Performance Efficiency Pillar
+
+**Implemented:**
+- Resource requests and limits
+- Autoscaling configuration
+- Performance targets and monitoring
+- Caching strategies
+- Load testing requirements
+
+---
+
+### Cost Optimization Pillar
+
+**Implemented:**
+- Right-sizing guidance
+- Resource efficiency requirements
+- Cost visibility and tracking
+- Optimization recommendations
+
+---
+
+## Changes Based on Google SRE Principles
+
+### Monitoring and Observability
+
+**Implemented:**
+- Four Golden Signals (Latency, Traffic, Errors, Saturation)
+- White-box and black-box monitoring
+- Prometheus metrics format
+- Structured logging (JSON)
+- Distributed tracing preparation
+
+---
+
+### Service Level Objectives
+
+**Implemented:**
+- SLI/SLO/SLA framework
+- Error budget concept
+- SLO-based alerting
+- Quarterly SLO reviews
+
+---
+
+### Incident Management
+
+**Implemented:**
+- Clear alert severity levels
+- Runbook requirements
+- Post-incident review requirements
+- Automation for known issues
+
+---
+
+### Capacity Planning
+
+**Implemented:**
+- Resource requirement documentation
+- Autoscaling configuration
+- Load testing expectations
+- Throughput documentation
+
+---
+
+## Summary of New Compliance Codes
+
+The following new compliance codes have been added:
+
+| Code | Description | Category |
+|------|-------------|----------|
+| COMP002.1-version-api | Version API endpoint requirement | Versioning |
+| COMP006.2-upgrade-time-limit | 15-minute upgrade limit | Deployment |
+| COMP014.1-health-states | Health state definitions | Reliability |
+| COMP014.2-probe-config | Probe configuration | Reliability |
+| COMP014.3-redundancy | Redundancy requirements | Reliability |
+| COMP014.4-pdb | Pod Disruption Budgets | Reliability |
+| COMP017-golden-signals | Golden Signals framework | Monitoring |
+| COMP017.1-latency-metrics | Latency metrics | Monitoring |
+| COMP017.2-traffic-metrics | Traffic metrics | Monitoring |
+| COMP017.3-error-metrics | Error metrics | Monitoring |
+| COMP017.4-saturation-metrics | Saturation metrics | Monitoring |
+| COMP018-alerting | Alerting best practices | Monitoring |
+| COMP018.1-slo-alerting | SLO-based alerting | Monitoring |
+| COMP019-slo | Service Level Objectives | Operations |
+| COMP020-resource-recommendations | Enhanced resource specs | Performance |
+| COMP021-disaster-recovery | Disaster recovery | Reliability |
+| COMP022-release-notes | Enhanced release notes | Documentation |
+| COMP023-security | Security requirements | Security |
+| COMP024-sbom | Software Bill of Materials | Security |
+| COMP025-api-practices | API design standards | Integration |
+| COMP026-service-mesh | Service mesh guidance | Architecture |
+| COMP027-documentation | Documentation requirements | Operations |
+| COMP028-compliance | Compliance and audit | Governance |
+| COMP029-performance | Performance requirements | Performance |
+| COMP030-cost-optimization | Cost optimization | Efficiency |
+
+---
+
+## Impact on Existing Applications
+
+### Immediate Requirements (Must Comply)
+
+Applications must immediately comply with:
+- Security hardening (non-root containers, network policies)
+- Health check improvements (proper probe configuration)
+- Logging to STDOUT in UTC
+- Basic metrics exposure
+
+### Phased Implementation (6-12 months)
+
+Applications should work toward:
+- Version API endpoint
+- 15-minute upgrade limit
+- Full Golden Signals metrics
+- SLO definitions
+- Comprehensive documentation
+- SBOM generation
+
+### Aspirational (12+ months)
+
+Longer-term improvements:
+- Advanced service mesh integration
+- Chaos engineering testing
+- Full OpenTelemetry implementation
+- Multi-region deployments
+
+---
+
+## Benefits of These Changes
 
 ### For SSC Hosting (Platform Team)
-1. **Improved Reliability**: Clear standards enable better monitoring and faster incident response
-2. **Automation**: Consistent naming and versioning enable automated tooling
-3. **Operational Visibility**: Version endpoints and structured health checks improve troubleshooting
-4. **Risk Reduction**: Disaster recovery and redundancy requirements reduce outage impact
 
-### For Suppliers (Development Teams)
-1. **Clear Expectations**: Specific requirements reduce ambiguity
-2. **Best Practices**: Alignment with industry standards (Microsoft, Google) provides proven patterns
-3. **Better Support**: Well-defined SLOs and health states make support more effective
-4. **Quality Improvement**: Security scanning and testing requirements improve overall quality
+1. **Better Visibility**: Version APIs and metrics provide clear view of system state
+2. **Faster Troubleshooting**: Proper logging, metrics, and runbooks reduce MTTR
+3. **Automated Operations**: Health checks and SLOs enable automation
+4. **Compliance**: Meet regulatory and audit requirements
+5. **Cost Control**: Resource optimization and cost visibility
+
+### For Dimpact (Contracting Party)
+
+1. **Quality Assurance**: Standards ensure consistent quality across suppliers
+2. **Risk Reduction**: DR, redundancy, and security requirements reduce risk
+3. **Predictability**: SLOs and performance targets provide clear expectations
+4. **Integration**: API standards ensure smooth component integration
+5. **Value**: Better reliability and performance for municipalities
+
+### For Suppliers (Software Developers)
+
+1. **Clear Requirements**: Know exactly what's expected
+2. **Best Practices**: Learn from industry leaders (Google, Microsoft)
+3. **Operational Excellence**: Build more maintainable systems
+4. **Competitive Advantage**: Modern, well-architected applications
+5. **Reduced Support Burden**: Better observability reduces support needs
 
 ### For Municipalities (End Users)
-1. **Higher Availability**: Zero-downtime deployments and redundancy reduce service interruptions
-2. **Faster Recovery**: Defined recovery procedures minimize downtime duration
-3. **Better Performance**: SLO monitoring ensures consistent service quality
-4. **Transparency**: Version information enables tracking of deployed versions
 
-## Migration Path from 2024Q3 to 2025Q4
+1. **Better Uptime**: Reliability improvements mean less downtime
+2. **Faster Performance**: Performance requirements ensure good UX
+3. **Data Protection**: Security and compliance requirements protect citizens
+4. **Faster Fixes**: Better observability enables faster incident resolution
+5. **Cost Efficiency**: Optimized resources mean better value
 
-### Immediate Requirements (MUST implement)
-1. Add `/version` endpoint to all applications
-2. Implement zero-downtime rolling updates
-3. Define and document SLOs for critical services
-4. Ensure 15-minute deployment window compliance
+---
 
-### Short-term Requirements (3-6 months)
-1. Enhance health checks with state definitions
-2. Implement retry mechanisms and circuit breakers
-3. Deploy across multiple availability zones
-4. Configure alerting on critical thresholds
+## Implementation Roadmap
 
-### Medium-term Requirements (6-12 months)
-1. Document and test disaster recovery procedures
-2. Implement comprehensive SLI monitoring
-3. Conduct chaos engineering tests
-4. Achieve Well-Architected Framework compliance
+### Phase 1 (Q1 2025): Critical Requirements
+- Implement version API endpoints
+- Enhance health checks with proper state definitions
+- Implement security hardening (non-root, network policies)
+- Set up basic Golden Signals metrics
 
-## Compliance Matrix Impact
+### Phase 2 (Q2 2025): Operational Excellence
+- Define and implement SLOs
+- Enhance alerting with SLO-based alerts
+- Implement Pod Disruption Budgets
+- Complete documentation (runbooks, architecture)
 
-The updates affect the compliance tracking in app-compliance-2024Q3.md:
+### Phase 3 (Q3 2025): Advanced Capabilities
+- Multi-zone deployment for critical services
+- Disaster recovery testing
+- Performance optimization
+- SBOM generation
 
-### Enhanced Requirements
-- COMP001-naming: Now requires DNS compliance check
-- COMP014-healthchecks: Requires state definition documentation
-- COMP017-resource-recommendations: Requires requests/limits specification
+### Phase 4 (Q4 2025): Continuous Improvement
+- Service mesh evaluation and potential implementation
+- Advanced monitoring (distributed tracing)
+- Chaos engineering practices
+- Cost optimization initiatives
 
-### New Requirements
-- COMP019-version-endpoint: New compliance check needed
-- COMP020-slo-sli: New compliance check needed
-- COMP021-redundancy: New compliance check needed
-- COMP022-alerting: New compliance check needed
-- COMP023-disaster-recovery: New compliance check needed
+---
 
 ## Conclusion
 
-This update represents a significant maturation of the PodiumD hosting standards, transforming from basic infrastructure requirements to comprehensive SRE/DevOps best practices. The changes directly address the Capgemini assessment findings, particularly the critical need for health state definitions (improving from 41/200 to target 120/200).
+This update represents a significant maturation of the PodiumD hosting standards, bringing them in line with current industry best practices from Microsoft, Google, and other leaders in cloud-native operations.
 
-By incorporating Microsoft Azure Well-Architected Framework and Google SRE principles, the document now provides suppliers with industry-standard guidance that will result in more reliable, scalable, and maintainable systems.
+The changes directly address the concerns raised in the Cap Gemini assessment while also incorporating modern SRE and DevOps practices that will:
 
-The phased migration path allows existing components to adopt new requirements progressively while ensuring all new components meet the enhanced standards from the start.
+1. **Improve Reliability**: Through better health checks, redundancy, and DR planning
+2. **Enhance Observability**: Through Golden Signals, SLOs, and comprehensive logging
+3. **Strengthen Security**: Through container hardening and network segmentation
+4. **Enable Scale**: Through proper resource management and autoscaling
+5. **Reduce Costs**: Through efficient resource usage and optimization
+6. **Improve Integration**: Through API standards and clear naming conventions
+7. **Speed Operations**: Through automation and clear documentation
 
-### Key Metrics for Success
-- **Reliability Score**: Target improvement from 41/200 to 120/200 (Capgemini assessment)
-- **Deployment Time**: All upgrades complete within 15 minutes
-- **Availability**: 99.9% or higher per SLO definitions
-- **Recovery Time**: Documented and tested RTO/RPO for all critical services
-- **Zero Downtime**: 100% of deployments executed without service interruption
+The phased implementation approach allows suppliers to adopt these standards gradually while still meeting critical requirements immediately.
 
-This update positions PodiumD as a modern, well-architected platform that meets the highest standards of reliability, security, and operational excellence.
+By following these standards, PodiumD will be well-positioned to deliver a reliable, secure, and performant platform for Dutch municipalities while maintaining operational excellence and cost efficiency.
+
+---
+
+## References
+
+1. **Cap Gemini PodiumD Assessment Report** - Provided feedback on reliability (41/200 score)
+2. **Microsoft Azure Well-Architected Framework** - <https://learn.microsoft.com/en-us/azure/well-architected/>
+3. **Google SRE Book** - <https://sre.google/sre-book/table-of-contents/>
+4. **Kubernetes Best Practices** - <https://kubernetes.io/docs/concepts/configuration/overview/>
+5. **Prometheus Best Practices** - <https://prometheus.io/docs/practices/naming/>
+6. **OpenTelemetry** - <https://opentelemetry.io/>
+7. **NIST Container Security** - <https://csrc.nist.gov/publications/detail/sp/800-190/final>
+8. **CIS Kubernetes Benchmark** - <https://www.cisecurity.org/benchmark/kubernetes>
+
+---
+
+**Document prepared by:** Jim Leitch, SSC Hosting  
+**Review and feedback welcome from:** Dimpact, Suppliers, Municipalities, Cap Gemini

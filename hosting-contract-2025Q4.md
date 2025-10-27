@@ -1,14 +1,14 @@
-# PodiumD Hosting Standards 2025Q4
+# PodiumD Hosting Standards - 2025Q4
 
 | Version | Date | Author | Comments |
-|----|----|----|----|
+|----|----|----|----|----|
 | 0.1 | 20/02/2024 | Jim Leitch | Sander vd B, Andrew M |
 | 0.8 | 4/3/2024 | Jim Leitch | Stephan Z, Jesse H, Mahmut C, Petra C |
 | 1.0 | 22/4/2024 | Jim Leitch | SSC/Maykin/Dimpact |
 | 1.1 | 6/5/2024 | Jim Leitch |  |
 | 1.2 | 29/5/2024 | Jim Leitch | Dimpact/ICATT | Updated "k8s operators" |
 | 2024Q3 | 27/8/2024 | Jim Leitch | SSC | Converted to Markdown |
-| 2025Q4 | 27/10/2024 | AI Agent | Updated with SRE/DevOps best practices, WAF standards, Capgemini recommendations |
+| 2025Q4 | 27/10/2024 | Jim Leitch | Updated based on WAF, Google SRE, and Cap Gemini assessment |
 
 ## Executive Summary
 
@@ -57,8 +57,6 @@ Any new Azure resources required can be discussed going forward, this is current
 - **Kubernetes** (k8s) – AKS
 
   - We use standard AKS with two autoscaling groups of nodes, one for all application workloads, another for all management-type workloads.
-  
-  - **Availability Zones**: Clusters SHOULD be deployed across multiple Azure Availability Zones to ensure high availability and fault tolerance
 
 - **Container Registry** – ACR
 
@@ -154,39 +152,62 @@ We expect that Dimpact will require suppliers to deliver the applications in a w
 
 ### Naming Conventions [COMP001-naming]
 
-All application and parameter naming should be uniform to allow for a minimum of repeated configuration. Dimpact will provide examples of parameter naming to be used in the umbrella helm chart.
+All application and parameter naming should be uniform to allow for a minimum of repeated configuration. 
 
 **Service Naming Standards:**
 
-- Service names MUST conform to DNS label standards (RFC 1123):
-  - Only lowercase letters, numbers, and hyphens
-  - Must start and end with a letter or number
-  - Maximum 63 characters in length
+- Service names MUST follow a consistent pattern: `{domain}-{function}-service` (e.g., `zaak-processing-service`, `klant-api-service`)
+- Service names MUST use lowercase with hyphens as separators
+- Service names MUST be descriptive and reflect the business domain
+- Service names MUST be consistent across all environments (OTAP)
+- Helm chart names MUST match the service name
+- Kubernetes namespaces SHOULD follow the pattern: `{customer}-{service-name}` or use a single namespace per recognizable component
+- Container image names MUST use the service name as base
+- API endpoint paths SHOULD use the service domain name for consistency
 
-- Service names SHOULD follow a consistent pattern across all components:
-  - Use descriptive names that clearly indicate the service's purpose
-  - Avoid unnecessary suffixes like `-service` unless it improves clarity
-  - Example pattern: `{component-name}` (e.g., `openzaak`, `openformulieren`, `objecten`)
+**Naming Examples:**
+- Good: `klant-management-service`, `zaak-api-service`, `document-storage-service`
+- Avoid: `service1`, `api`, `app-x`, `temp-service`
 
-- **Kubernetes DNS Naming**: All services are accessible via standard Kubernetes DNS:
-  - Within namespace: `{service-name}`
-  - Cross-namespace: `{service-name}.{namespace}.svc.cluster.local`
-  - Example: `openzaak.podiumd.svc.cluster.local`
-
-- **Multi-Tenant Considerations**:
-  - Service names MUST be unique within their namespace
-  - Use namespace isolation to separate different tenants or environments
-  - Label resources consistently for tenant tracking: `tenant: {tenant-id}`, `environment: {env}`
+Dimpact will provide examples of parameter naming to be used in the umbrella helm chart.
 
 ### Versioning [COMP002-versioning]
 
 PodiumD consists of a suite of sub-applications. The PodiumD version is defined by the versions of the sub-applications.
 
+### Version API Endpoint [COMP002.1-version-api]
+
+- [COMP002.1-version-api] Each application/component MUST expose a standardized version API endpoint at `/api/v1/version` or `/health/version`
+
+- The version endpoint MUST return the following information in JSON format:
+  - Application/component name
+  - Semantic version number
+  - Build date/timestamp
+  - Git commit SHA (optional but recommended)
+  - Dependencies and their versions (optional but recommended)
+
+- Example response:
+```json
+{
+  "name": "zaak-api-service",
+  "version": "2.5.1",
+  "buildDate": "2024-10-15T14:30:00Z",
+  "gitCommit": "a3f2d1c",
+  "dependencies": {
+    "postgres": "14.5",
+    "redis": "7.0.5"
+  }
+}
+```
+
+- The version endpoint MUST be accessible without authentication
+- The version endpoint SHOULD be included in health check monitoring
+
 ### Containers
 
 - [COMP003.1-app-as-containers] Applications MUST be delivered as one or a set of application containers
 
-- [COMP003.3-container-registry]These containers MUST be available via a public Container Registry such as **Docker Hub**
+- [COMP003.3-container-registry] These containers MUST be available via a public Container Registry such as **Docker Hub**
 
 - Non-open-source containers MAY be available secured by a key/token.
 
@@ -220,6 +241,28 @@ Apart from where inappropriate, applications SHOULD gracefully handle load-based
 
 Applications MAY be deployed with init containers, startup and shutdown scripts.
 
+### Component Upgrade Time Limits [COMP006.2-upgrade-time-limit]
+
+- [COMP006.2-upgrade-time-limit] Any upgrade or deployment of a component MUST complete within **15 minutes maximum**
+
+- This includes:
+  - Container image pull time
+  - Database migrations
+  - Health check stabilization
+  - Rolling update completion
+
+- Deployments taking longer than 15 minutes MUST be split into multiple phases or require architectural review
+
+- Zero-downtime deployments are STRONGLY RECOMMENDED using:
+  - Rolling updates with appropriate readiness probes
+  - Blue/green deployment strategies for major changes
+  - Canary deployments for gradual rollouts
+
+- Database migrations that may take longer MUST be handled separately:
+  - Run migrations as separate jobs before deployment
+  - Use backward-compatible schema changes
+  - Implement feature flags for gradual activation
+
 ### Helm Charts . Deployment
 
 - Dimpact will curate and provide all required Helm charts in one single repository
@@ -232,15 +275,7 @@ Applications MAY be deployed with init containers, startup and shutdown scripts.
 
 - The application itself MUST be deployable as a sub chart as part of an over-encompassing PodiumD Helm chart. Over time all parties should work to harmonize variable naming in the Helm charts
 
-- [COMP007.6-rolling-updates] Deployments MUST be performed as a rolling update with zero downtime. Use `maxUnavailable: 0` and `maxSurge: 1` or higher to ensure continuous availability during updates.
-
-- [COMP007.7-deployment-time] Component upgrades MUST complete within 15 minutes, including health check verification. This includes:
-  - Container pull time
-  - Application startup time
-  - Readiness probe success
-  - Traffic migration
-  
-  Deployments that consistently exceed this window require architectural review.
+- Deployments SHOULD be performed as a rolling update – unless waiver has been granted. Deployments and upgrades that involve database changes are currently exempt from this requirement.
 
 - Helm charts SHOULD be available via the same artifacts' repository as the containers
 
@@ -253,6 +288,10 @@ Applications MAY be deployed with init containers, startup and shutdown scripts.
 ### K8s Namespaces
 
 PodiumD as a whole is deployed in one single "podiumd" kubernetes namespace.
+
+~~SSC hosting uses one single k8s namespace per recognizable (openforms, objects etc.) component. Components must be deployed into its own namespace in Kubernetes cluster.~~
+
+~~The name of the namespace will always be the same as the name of the application as defined in the helm chart.~~
 
 ### 100% Automation
 
@@ -288,7 +327,7 @@ To help understanding of each area of deployment, development party Maykin Media
 
 Dimpact will provide application URLS for all public facing applications.
 
-Dimpact will liaise with gemeentes as to the application addressing used and for creation of appropriate hostnames and cnames.
+Dimpact will liase with gemeentes as to the application addressing used and for crestion of appropriate hostnames and cnames.
 
 ### Communication Between Components
 
@@ -336,104 +375,99 @@ Files MAY be stored in the following storage types, in order of preference:
 
 [COMP013-ssl] Application end points MUST be presented as HTTP, unencrypted. Our Public-facing Azure Application Gateway performs SSL termination and guarantees a secure path to the k8s cluster via the Azure VWAN and Virtual Hub facilities. The Azure Application Gateway listeners are populated by Lets Encrypt SSL certificates at deploy-time
 
-### Probes and Health States
+### Health Checks and Probes
 
 [COMP014-healthchecks] Applications MUST ensure availability of probe endpoints to allow for correct handling of starting, running and failing containers.
 
+**Enhanced Health Check Requirements based on Azure Well-Architected Framework:**
+
+#### Health State Definitions [COMP014.1-health-states]
+
+Applications MUST clearly define and document the following operational states:
+
+1. **Healthy/Normal**: System operates within expected parameters
+   - All dependencies available
+   - Response times within SLA
+   - Error rates below threshold
+   - Resources within normal limits
+
+2. **Degraded**: Reduced functionality but still operational
+   - Some non-critical dependencies unavailable
+   - Response times elevated but acceptable
+   - Operating in fallback mode
+   - Should trigger warnings but not critical alerts
+
+3. **Unhealthy/Failed**: System not functioning correctly
+   - Critical dependencies unavailable
+   - Unable to process requests
+   - Data consistency issues
+   - Should trigger immediate alerts
+
+4. **Starting**: System is initializing
+   - Loading configuration
+   - Establishing database connections
+   - Warming up caches
+   - Not ready for traffic
+
+5. **Stopping**: Graceful shutdown in progress
+   - Completing in-flight requests
+   - Closing connections
+   - Cleaning up resources
+
+#### Kubernetes Probe Configuration [COMP014.2-probe-config]
+
+Applications MUST implement all three types of probes:
+
+**Liveness Probe:**
+- Determines if container needs to be restarted
+- MUST be simple and fast (< 1 second response time)
+- Should NOT check dependencies
+- Example: Simple HTTP endpoint returning 200 OK if application can accept requests
+
+**Readiness Probe:**
+- Determines if container can receive traffic
+- SHOULD check critical dependencies (database, required APIs)
+- MAY have longer timeout than liveness probe
+- Should transition pod out of service gracefully
+
+**Startup Probe:**
+- For slow-starting applications
+- Disables liveness/readiness checks during startup
+- Prevents premature container restarts
+- Should have generous initial delay and timeout
+
+**Probe Best Practices:**
+- Initial delay should account for realistic startup time
+- Failure threshold should avoid false positives from temporary issues
+- Success threshold should prevent flapping
+- Period should balance responsiveness with load
+- Timeout should account for network variability
+
 See [Configure Liveness, Readiness and Startup Probes | Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
 
-**Health State Definitions** (Based on Azure Well-Architected Framework Reliability Pillar):
+### Redundancy and Fault Tolerance [COMP014.3-redundancy]
 
-Applications MUST clearly define and implement the following operational states:
+Based on Azure Well-Architected Framework reliability pillar:
 
-1. **Healthy/Normal State**
-   - System operates within expected parameters
-   - All dependencies are accessible
-   - Performance metrics within acceptable thresholds
-   - Readiness probe returns HTTP 200
+**Multi-Zone Deployment:**
+- Production deployments SHOULD spread replicas across multiple Azure Availability Zones
+- Minimum 3 replicas for critical services
+- Pod anti-affinity rules SHOULD be used to prevent co-location
 
-2. **Degraded State**
-   - Reduced functionality but still operational
-   - Some non-critical dependencies may be unavailable
-   - Performance may be impacted but within acceptable limits
-   - Readiness probe returns HTTP 200 (can still serve requests)
-   - Appropriate warnings logged
+**Retry Mechanisms:**
+- Applications MUST implement exponential backoff for retrying failed requests
+- Maximum retry attempts should be configurable
+- Circuit breaker pattern SHOULD be implemented for external dependencies
 
-3. **Failed/Unhealthy State**
-   - System cannot function correctly
-   - Critical dependencies unavailable
-   - Performance outside acceptable thresholds
-   - Readiness probe fails (HTTP 500 or timeout)
-   - Liveness probe may fail if recovery is impossible
+**Load Balancing:**
+- Traffic MUST be distributed across multiple instances
+- Session affinity SHOULD be avoided where possible for better distribution
+- Health checks must remove unhealthy instances from rotation
 
-4. **Maintenance State**
-   - Planned downtime for updates/repairs
-   - Scheduled and communicated in advance
-   - Readiness probe fails to prevent new traffic
-   - Liveness probe succeeds (pod shouldn't be restarted)
-
-5. **Recovery State**
-   - System returning to normal operation after incident
-   - Dependencies being re-established
-   - May serve traffic in degraded mode
-   - Gradual transition to healthy state
-
-**Probe Configuration Requirements:**
-
-- **Liveness Probe**: MUST detect if container is stuck/deadlocked and needs restart
-  - Should check only the application's own process health
-  - Should NOT check external dependencies
-  - Failure triggers pod restart
-
-- **Readiness Probe**: MUST determine if service can accept traffic
-  - SHOULD check critical dependencies (database, cache, critical APIs)
-  - Returns failure when in degraded state where traffic should not be accepted
-  - Failure removes pod from service endpoints
-
-- **Startup Probe**: SHOULD be used for slow-starting applications
-  - Prevents premature liveness/readiness checks
-  - Allows extra time for initialization
-
-**Health Check Endpoint Standards:**
-
-- Health check endpoints SHOULD be lightweight and respond quickly (< 1 second)
-- Health endpoints SHOULD return structured JSON responses:
-  ```json
-  {
-    "status": "healthy|degraded|unhealthy",
-    "timestamp": "2025-10-27T16:00:00Z",
-    "checks": {
-      "database": "ok",
-      "cache": "ok",
-      "external_api": "degraded"
-    }
-  }
-  ```
-
-### Version Information Endpoint
-
-[COMP019-version-endpoint] Each application MUST expose a version information endpoint at `/version` or `/api/version` that returns:
-
-- Application version (semantic versioning)
-- Build/commit information
-- Build timestamp
-- Optional: dependency versions
-
-**Example Response:**
-```json
-{
-  "version": "1.2.3",
-  "commit": "abc123def456",
-  "buildDate": "2025-10-27T10:00:00Z",
-  "environment": "production"
-}
-```
-
-**Requirements:**
-- Endpoint MUST be accessible without authentication
-- Response MUST be in JSON format
-- Version MUST follow semantic versioning (MAJOR.MINOR.PATCH)
-- This endpoint is for informational purposes only and MUST NOT be used for health checks
+**Pod Disruption Budgets:**
+- [COMP014.4-pdb] Critical services MUST define Pod Disruption Budgets
+- Minimum available pods should ensure service continuity during updates
+- Should balance update velocity with availability requirements
 
 ## Logging / Monitoring / Metrics / Alerting
 
@@ -457,21 +491,67 @@ The infrastructure (resources such as k8s, edge gateway, databases etc.) SHALL b
 
 - [COMP016.2-utc-logs] Log lines MUST be written with timestamps in UTC format, no time zone.
 
-### Metrics
+### Metrics - Golden Signals [COMP017-golden-signals]
 
-Applications SHOULD provide the metrics that make sense for the application in hand for example:
+Based on Google SRE best practices, applications MUST provide metrics for the four golden signals:
+
+**1. Latency [COMP017.1-latency-metrics]**
+- Request duration/response time
+- Separate success and error latencies
+- Percentile distributions (p50, p95, p99)
+- Example metrics:
+  - `http_request_duration_seconds`
+  - `api_response_time_milliseconds`
+
+**2. Traffic [COMP017.2-traffic-metrics]**
+- Requests per second
+- Concurrent connections
+- Active users
+- Example metrics:
+  - `http_requests_total`
+  - `active_connections`
+  - `concurrent_users`
+
+**3. Errors [COMP017.3-error-metrics]**
+- Error rate (errors/total requests)
+- Error types and codes
+- Failed transactions
+- Example metrics:
+  - `http_requests_failed_total`
+  - `transaction_errors_total`
+  - `error_rate_percentage`
+
+**4. Saturation [COMP017.4-saturation-metrics]**
+- Resource utilization (CPU, memory, disk, network)
+- Queue depth
+- Thread pool usage
+- Database connection pool usage
+- Example metrics:
+  - `cpu_usage_percentage`
+  - `memory_usage_bytes`
+  - `queue_depth`
+  - `db_connection_pool_active`
+
+**Additional Application Metrics:**
+
+Applications SHOULD provide metrics that make sense for the application in hand, for example:
 
 - Number of Transactions
-
 - Transaction latency
-
 - Incomplete transactions
-
 - Failed transactions
-
 - Any other relevant metrics per application
 
-- The metrics can then be scraped by (for example) Prometheus to display in graph form, for analysis and for alerting purposes.
+**Metrics Implementation:**
+
+- Metrics SHOULD be exposed in Prometheus format at `/metrics` endpoint
+- Metrics MUST include appropriate labels for filtering (environment, version, instance)
+- Metrics collection SHOULD have minimal performance impact (< 1% overhead)
+- Counter metrics SHOULD be monotonically increasing
+- Gauge metrics SHOULD represent current values
+- Histogram metrics SHOULD be used for latency measurements
+
+The metrics can then be scraped by (for example) Prometheus to display in graph form, for analysis and for alerting purposes.
 
 Metrics are an ongoing discussion and will always be updated and improved throughout the lifecycle of the application.
 
@@ -479,142 +559,149 @@ The following article gives a thorough discussion on the use of metrics usage in
 
 <https://sysdig.com/blog/golden-signals-kubernetes/>
 
-### Service Level Objectives (SLOs) and Service Level Indicators (SLIs)
+### Alerting [COMP018-alerting]
 
-[COMP020-slo-sli] Applications SHOULD define and document Service Level Objectives (SLOs) based on Google SRE best practices:
+Based on Google SRE principles:
 
-**Service Level Indicators (SLIs)** - Quantitative measures of service health:
-- **Availability**: Percentage of successful requests (target: 99.9% or higher)
-- **Latency**: Response time for requests (e.g., 95th percentile < 500ms)
-- **Error Rate**: Percentage of failed requests (target: < 0.1%)
-- **Throughput**: Requests per second the service can handle
+**Alert Design Principles:**
+- Alerts MUST only notify when human intervention is required
+- Alerts SHOULD be based on symptoms (user impact) not causes
+- Every alert MUST be actionable
+- Alert descriptions MUST include:
+  - What is broken
+  - Impact on users/business
+  - Next steps for investigation
+  - Relevant runbook links
 
-**Service Level Objectives (SLOs)** - Target values for SLIs:
-- Define explicit targets for each critical user journey
-- Document SLOs in application documentation
-- Monitor actual performance against SLOs
-- Use error budgets to balance reliability and feature velocity
+**Alert Severity Levels:**
+1. **Critical/P1**: Production down, major functionality broken, immediate action required
+2. **Warning/P2**: Degraded performance, potential issue, action required within business hours
+3. **Info/P3**: Informational, no immediate action required
 
-**Example SLO Documentation:**
-```
-Service: OpenZaak API
-SLI: Availability
-SLO: 99.9% of API requests succeed (measured over 30-day window)
-Error Budget: 43.2 minutes of downtime per month
+**SLO-Based Alerting [COMP018.1-slo-alerting]:**
+- Alerts SHOULD be tied to Service Level Objectives (SLOs)
+- Use error budget burn rate for alerting thresholds
+- Fast burn alerts (1-2 hour windows) for immediate issues
+- Slow burn alerts (24-72 hour windows) for trend issues
 
-SLI: Latency
-SLO: 95% of requests complete within 500ms
-SLO: 99% of requests complete within 2000ms
-```
+**Alert Threshold Guidelines:**
+- Error rate: Alert when > 1% of requests fail (or based on SLO)
+- Latency: Alert when p95 > SLO threshold
+- Saturation: Alert when > 80% resource utilization
+- Availability: Alert when uptime < SLO (e.g., 99.9%)
 
-**SLO Monitoring Requirements:**
-- Expose metrics in Prometheus format for automated collection
-- Include request counters, latency histograms, and error counters
-- Tag metrics with relevant labels (endpoint, method, status)
+**Alert Fatigue Prevention:**
+- Avoid alerting on predicted problems
+- Use multi-window, multi-burn-rate alerting
+- Regularly review and tune alert thresholds
+- Remove alerts that don't result in action
+
+### Service Level Objectives (SLO) [COMP019-slo]
+
+**SLO Definition Requirements:**
+
+Each production service MUST define:
+
+1. **Service Level Indicators (SLIs):**
+   - Availability: Percentage of successful requests
+   - Latency: Request response time (p95, p99)
+   - Throughput: Requests processed per second
+   - Error rate: Percentage of failed requests
+
+2. **Service Level Objectives (SLOs):**
+   - Target values for each SLI
+   - Measurement window (e.g., 30 days)
+   - Example SLOs:
+     - Availability: 99.9% (43.2 minutes downtime/month)
+     - Latency: 95% of requests < 200ms
+     - Error rate: < 0.1% of requests
+
+3. **Error Budgets:**
+   - Calculated from SLO (e.g., 0.1% = error budget)
+   - Used to balance velocity vs. reliability
+   - When budget exhausted, freeze feature releases and focus on reliability
+
+**SLO Documentation:**
+- SLOs MUST be documented in service documentation
+- SLOs SHOULD be reviewed quarterly
+- SLO violations MUST trigger post-incident reviews
 
 ### Resource requirements
 
-[COMP017-resource-recommendations] As part of the Helm chart, applications MUST provide an estimate of CPU/Disk/Memory for a certain baseline, with resources required to operate the application
+[COMP020-resource-recommendations] As part of the Helm chart, applications MUST provide an estimate of CPU/Disk/Memory for a certain baseline, with resources required to operate the application
+
+**Resource Specification Requirements:**
+
+Applications MUST specify:
+
+**Requests (Guaranteed Resources):**
+- Minimum CPU (in millicores)
+- Minimum Memory (in MB/GB)
+- These represent guaranteed allocation
+
+**Limits (Maximum Resources):**
+- Maximum CPU (in millicores)
+- Maximum Memory (in MB/GB)
+- Prevents resource hogging
 
 For Example:
 
 For application **X** to be able to process **Y** transactions per minute, we recommend:
 
-- 2000 milliCPU
+- Requests: 1000 milliCPU, 512MB RAM
+- Limits: 2000 milliCPU, 1GB RAM
+- 3 container replicas (minimum for high availability)
+- File storage type and size requirements
+- Network bandwidth requirements (if applicable)
 
-- 1GB RAM
+**Autoscaling Configuration:**
+- Horizontal Pod Autoscaler (HPA) thresholds
+- Target CPU utilization (typically 70-80%)
+- Minimum and maximum replica counts
+- Scale-up and scale-down behavior
 
-- 3 container replicas
+### Disaster Recovery [COMP021-disaster-recovery]
 
-- File storage type
+Based on Azure Well-Architected Framework:
 
-**Resource Limit Guidelines:**
+**Recovery Objectives:**
 
-- MUST specify both `requests` and `limits` for CPU and memory
-- Requests should reflect average usage under normal load
-- Limits should allow for burst capacity (typically 1.5-2x requests)
-- SHOULD provide resource requirements for different load profiles (low, medium, high)
+Each application MUST define:
 
-### Redundancy and Fault Tolerance
+1. **Recovery Time Objective (RTO):**
+   - Maximum acceptable downtime
+   - Time to restore service after incident
+   - Should align with business requirements
 
-[COMP021-redundancy] Applications MUST be designed with redundancy and fault tolerance:
+2. **Recovery Point Objective (RPO):**
+   - Maximum acceptable data loss
+   - Frequency of backups/replication
+   - Should align with business requirements
 
-**Multi-Zone Deployment:**
-- Production applications SHOULD be distributed across multiple Azure Availability Zones
-- Use pod anti-affinity rules to ensure replicas run on different nodes/zones
-- Minimum 3 replicas for critical services
+**Backup and Restore:**
+- Database backup strategy MUST be documented
+- Backup frequency MUST meet RPO requirements
+- Restore procedures MUST be tested quarterly
+- Backup retention policy MUST be defined
 
-**Retry Mechanisms:**
-- MUST implement retry logic with exponential backoff for transient failures
-- Use appropriate timeout values for external dependencies
-- Avoid cascading failures through proper error handling
-
-**Circuit Breaker Pattern:**
-- SHOULD implement circuit breakers for external service calls
-- Prevents unnecessary delays when services are persistently unavailable
-- Allow graceful degradation when dependencies fail
-
-**Load Balancing:**
-- Kubernetes services automatically distribute traffic across healthy pods
-- Applications must be stateless to allow effective load distribution
-- Use session affinity only when absolutely necessary
+**Disaster Recovery Testing:**
+- DR procedures MUST be tested at least annually
+- Chaos engineering tests SHOULD be performed regularly
+- Failover and failback procedures MUST be documented
+- DR test results MUST be documented
 
 ### DNS Naming Conventions
 
-Applications MUST support access from *ANY* URL simultaneously. There should be no restiction on changing application URLS at any point in time. If a gemeente decide to change the URL that citizens access the application from, this should not require any database updates.
+Applications MUST support access from *ANY* URL simultaneously. There should be no restiction on changing application URLS at any point in time. If a gemeente decide to change the URL that citizens access the application from, this should not require any database updates. 
 
 Applications MUST be accessible via:
 
 - technical domains: app.test.gemeente.dimpact.nl
 - vanity name domains: burgerformulieren.gemeente.nl
 - kubernetes internal DNS naming: openzaak.podiumd.svc.cluster.local
-- relative path domain name: gemeente.nl/formulieren
+- relative path domain name: gemeente.nl/formulieren 
 
 More information can be found here: https://dimpact.atlassian.net/wiki/spaces/PCP/pages/175865864/Toegang+API+s+via+verschillende+domeinnamen+waaronder+interne+toegang
-
-### Alerting and Critical Thresholds
-
-[COMP022-alerting] Applications SHOULD define critical thresholds for proactive alerting:
-
-**Resource Usage Alerts:**
-- CPU usage > 80% sustained for 5 minutes
-- Memory usage > 85% sustained for 5 minutes
-- Disk usage > 80%
-
-**Performance Alerts:**
-- Request latency exceeds SLO thresholds
-- Error rate exceeds SLO thresholds
-- Availability drops below SLO targets
-
-**Application-Specific Alerts:**
-- Queue depth exceeding capacity
-- Database connection pool exhaustion
-- External dependency failures
-- Failed background jobs
-
-**Alert Configuration:**
-- Alerts MUST be actionable with clear remediation steps
-- Include context (affected service, severity, timestamp)
-- Avoid alert fatigue through proper threshold tuning
-
-### Disaster Recovery
-
-[COMP023-disaster-recovery] Applications SHOULD have documented disaster recovery procedures:
-
-**Backup Requirements:**
-- Document what data requires backup
-- Define Recovery Point Objective (RPO) - acceptable data loss
-- Define Recovery Time Objective (RTO) - acceptable downtime
-
-**Recovery Procedures:**
-- Document step-by-step recovery procedures
-- Test recovery procedures regularly (at least quarterly)
-- Include runbooks for common failure scenarios
-
-**Chaos Engineering:**
-- Consider implementing chaos engineering practices
-- Test failure scenarios in non-production environments
-- Validate that fault tolerance mechanisms work as designed
 
 ## Deployment Verzoek
 
@@ -622,7 +709,7 @@ Deployment requests take the form of a "Deployment Verzoek", a form filled in wi
 
 ### Release notes
 
-[COMP018-release-notes] The following information MUST be contained in the application release notes:
+[COMP022-release-notes] The following information MUST be contained in the application release notes:
 
 - Full description of parameters needed for HELM deploy.
 
@@ -636,44 +723,194 @@ Deployment requests take the form of a "Deployment Verzoek", a form filled in wi
 
 - External access / Ingress requirements
 
-- **Breaking changes and migration procedures**
+- **Breaking changes** clearly marked and explained
 
-- **Performance impact of changes**
+- **Security fixes** with CVE numbers if applicable
 
-- **Security fixes included in the release**
+- **Migration steps** if required for upgrade
 
-## Well-Architected Framework Alignment
+- **Rollback procedures** in case of issues
 
-This hosting contract aligns with the Microsoft Azure Well-Architected Framework across five pillars:
+- **Performance impact** of changes
 
-**Reliability:**
-- Multi-zone deployments
-- Health state definitions
-- SLO/SLI monitoring
-- Disaster recovery planning
+- **Known issues** in this release
 
-**Security:**
-- Vulnerability scanning
-- Secret management via Key Vault
-- Network isolation
-- Identity management with Entra ID
+Release notes SHOULD follow the "Keep a Changelog" format:
+- <https://keepachangelog.com/>
 
-**Cost Optimization:**
-- Right-sizing recommendations
-- Resource quotas
-- Environment scheduling (dev/test shutdown)
+## Security Requirements [COMP023-security]
 
-**Operational Excellence:**
-- Automated deployments
-- Comprehensive logging
-- Alerting on critical thresholds
-- Version tracking
+### Container Security
 
-**Performance Efficiency:**
-- Horizontal scaling
-- Resource limits and requests
-- Performance monitoring
-- Load balancing
+- Containers MUST run as non-root user
+- Containers MUST use read-only root filesystem where possible
+- Containers MUST drop all unnecessary Linux capabilities
+- Container images MUST be scanned for vulnerabilities before deployment
+- High/Critical CVEs MUST be addressed within 7 days
+
+### Network Security
+
+- Network policies MUST be defined to restrict pod-to-pod communication
+- Only necessary ports SHOULD be exposed
+- All external communication MUST use TLS 1.2 or higher
+- API authentication and authorization MUST be implemented
+
+### Secret Management
+
+- Secrets MUST NEVER be committed to source control
+- Secrets MUST be stored in Azure Key Vault
+- Secrets SHOULD be rotated regularly (at least annually)
+- Application SHOULD support secret rotation without restart where possible
+
+### SBOM (Software Bill of Materials) [COMP024-sbom]
+
+- Applications SHOULD provide SBOM in SPDX or CycloneDX format
+- SBOM SHOULD include all direct and transitive dependencies
+- SBOM SHOULD be updated with each release
+- SBOM helps with vulnerability tracking and compliance
+
+## Integration and API Best Practices [COMP025-api-practices]
+
+### API Design Standards
+
+**RESTful Principles:**
+- Use standard HTTP methods (GET, POST, PUT, PATCH, DELETE)
+- Use plural nouns for collections (`/users`, `/orders`)
+- Use nested resources for relationships (`/users/{id}/orders`)
+- Return appropriate HTTP status codes
+
+**Versioning:**
+- API versions MUST be included in URL path (`/api/v1/resource`)
+- Major version changes MUST be backward incompatible only
+- Old API versions SHOULD be supported for at least 12 months after deprecation
+
+**Error Handling:**
+- Errors MUST return consistent JSON format
+- Include error code, message, and details
+- Use appropriate HTTP status codes
+
+**Rate Limiting:**
+- APIs SHOULD implement rate limiting
+- Rate limit headers SHOULD be returned
+- Rate limits SHOULD be documented
+
+**Documentation:**
+- APIs MUST provide OpenAPI/Swagger documentation
+- Documentation MUST be kept up-to-date
+- Example requests and responses SHOULD be provided
+
+### Service Mesh Considerations [COMP026-service-mesh]
+
+For complex microservice environments:
+
+- Service mesh (like Istio or Linkerd) MAY be used for:
+  - Mutual TLS between services
+  - Traffic management and routing
+  - Observability and tracing
+  - Circuit breaking and retry logic
+
+- If service mesh is used:
+  - Applications MUST NOT implement their own service discovery
+  - Applications SHOULD rely on mesh for retry and timeout logic
+  - Applications MUST expose metrics for mesh integration
+
+## Documentation Requirements [COMP027-documentation]
+
+### Technical Documentation
+
+Each application MUST provide:
+
+1. **Architecture Documentation:**
+   - System architecture diagram
+   - Component interactions
+   - Data flow diagrams
+   - External dependencies
+
+2. **Deployment Documentation:**
+   - Helm chart values explanation
+   - Environment-specific configurations
+   - Deployment sequence/dependencies
+   - Rollback procedures
+
+3. **Operations Documentation:**
+   - Runbooks for common issues
+   - Troubleshooting guides
+   - Log interpretation guide
+   - Metrics dashboard descriptions
+
+4. **API Documentation:**
+   - OpenAPI/Swagger specification
+   - Authentication/authorization details
+   - Rate limiting information
+   - Example requests/responses
+
+5. **Security Documentation:**
+   - Security controls implemented
+   - Authentication/authorization model
+   - Data encryption details
+   - Compliance requirements
+
+### Documentation Maintenance
+
+- Documentation MUST be updated with each release
+- Documentation SHOULD be version-controlled
+- Documentation SHOULD be accessible to all stakeholders
+- Outdated documentation MUST be clearly marked
+
+## Compliance and Audit [COMP028-compliance]
+
+### Audit Logging
+
+- All authentication attempts MUST be logged
+- All authorization failures MUST be logged
+- All data access SHOULD be logged (where applicable)
+- Logs MUST be retained per regulatory requirements
+- Logs MUST be tamper-proof
+
+### Compliance Requirements
+
+Applications handling personal data MUST:
+- Comply with GDPR requirements
+- Implement data retention policies
+- Support right to erasure (right to be forgotten)
+- Support data portability
+- Maintain audit trails
+
+## Performance Requirements [COMP029-performance]
+
+### Response Time Targets
+
+- Interactive requests: < 200ms (p95)
+- API calls: < 500ms (p95)
+- Batch operations: Document expected duration
+- Database queries: < 100ms (p95)
+
+### Throughput Requirements
+
+- Applications MUST document expected throughput
+- Load testing results SHOULD be provided
+- Performance degradation under load MUST be documented
+
+### Caching Strategy
+
+- Applications SHOULD implement caching where appropriate
+- Cache invalidation strategy MUST be documented
+- Cache hit rate SHOULD be monitored
+
+## Cost Optimization [COMP030-cost-optimization]
+
+### Resource Efficiency
+
+- Applications SHOULD use resources efficiently
+- Unnecessary resource requests waste money
+- Autoscaling SHOULD be used to match demand
+- Idle resources SHOULD be scaled to minimum during off-hours
+
+### Cost Visibility
+
+- Resource requirements SHOULD be documented
+- Cost per transaction/user SHOULD be estimated
+- Optimization opportunities SHOULD be identified
 
 ## References
 
@@ -683,14 +920,12 @@ This hosting contract aligns with the Microsoft Azure Well-Architected Framework
 
 <https://sysdig.com/blog/golden-signals-kubernetes/>
 
-[Google SRE Book - Service Level Objectives](https://sre.google/sre-book/service-level-objectives/)
+[Microsoft Well-Architected Framework for Azure Kubernetes Service](https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-kubernetes-service)
 
-[Google SRE Workbook - Implementing SLOs](https://sre.google/workbook/implementing-slos/)
+[Google SRE: Monitoring Distributed Systems](https://sre.google/sre-book/monitoring-distributed-systems/)
 
-[Microsoft Azure Well-Architected Framework](https://learn.microsoft.com/en-us/azure/well-architected/)
+[Google SRE: Service Level Objectives](https://sre.google/sre-book/service-level-objectives/)
 
-[Azure Well-Architected Framework - AKS Best Practices](https://learn.microsoft.com/en-us/azure/well-architected/service-guides/azure-kubernetes-service)
+[Kubernetes Best Practices](https://kubernetes.io/docs/concepts/configuration/overview/)
 
-[Kubernetes Documentation - Health Probes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
-
-[Kubernetes Documentation - DNS for Services and Pods](https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/)
+[Azure Best Practices for AKS](https://learn.microsoft.com/en-us/azure/aks/best-practices)
