@@ -347,6 +347,61 @@ Final functional configuration "inside" the application is out of scope.
   - Events, message queues for decoupling
   - Synchronous calls **MUST** include timeouts, retries, circuit breaking
 
+### Redundancy and Fault Tolerance [COMP009A-resilience]
+
+**Applications MUST implement redundancy and fault tolerance mechanisms to meet reliability requirements.**
+
+Based on the Azure Well-Architected Framework, applications **MUST** be designed to handle failures gracefully and maintain availability.
+
+- [COMP009A.1-multi-zone] **Multi-Zone Deployments**: Applications **SHOULD** support deployment across Azure Availability Zones
+  - Pod anti-affinity rules to spread replicas across zones
+  - Topology spread constraints for even distribution
+  - Zone-aware persistent storage when needed
+  - Graceful handling of zone failures
+
+- [COMP009A.2-retry-mechanisms] **Retry Logic**: Applications **MUST** implement retry mechanisms for transient failures
+  - Exponential backoff for retries (e.g., 1s, 2s, 4s, 8s)
+  - Maximum retry attempts (typically 3-5)
+  - Jitter to prevent thundering herd
+  - Retry only idempotent operations or use idempotency keys
+  - Log retry attempts for debugging
+  
+- [COMP009A.3-circuit-breaker] **Circuit Breaker Pattern**: Applications **SHOULD** implement circuit breakers for external dependencies
+  - Prevent cascading failures from slow/failing dependencies
+  - Three states: Closed (normal), Open (failing), Half-Open (testing recovery)
+  - Configurable failure threshold (e.g., 50% errors over 10 requests)
+  - Configurable timeout before attempting recovery (e.g., 30-60 seconds)
+  - Fallback mechanisms when circuit is open (cached data, degraded functionality)
+  - Examples: Use libraries like Polly (.NET), Resilience4j (Java), PyBreaker (Python)
+
+- [COMP009A.4-load-balancing] **Load Balancing**: Applications **MUST** support load balancing across multiple instances
+  - Minimum 2 replicas for production (3+ recommended)
+  - Kubernetes Service load balancing for internal traffic
+  - Azure Application Gateway for external traffic
+  - Session affinity **SHOULD** be avoided (use stateless design)
+  - Health-based routing (only healthy pods receive traffic)
+
+- [COMP009A.5-timeouts] **Timeouts**: All external calls **MUST** have appropriate timeouts
+  - Connection timeout (typically 5-10 seconds)
+  - Request timeout (typically 30-60 seconds, depending on operation)
+  - Database query timeout (typically 10-30 seconds)
+  - Never use infinite timeouts
+  - Document expected timeout values
+
+- [COMP009A.6-bulkhead] **Bulkhead Pattern**: Applications **SHOULD** isolate critical resources
+  - Separate thread pools for different operations
+  - Resource limits per operation type
+  - Prevent resource exhaustion from affecting entire application
+  - Example: Separate pools for user requests vs. background jobs
+
+- [COMP009A.7-rate-limiting] **Rate Limiting**: Applications **SHOULD** implement rate limiting
+  - Protect against overload and abuse
+  - Per-client rate limits for public APIs
+  - Backpressure mechanisms for internal queues
+  - Return HTTP 429 (Too Many Requests) with Retry-After header
+
+Reference: [Azure Well-Architected Framework - Reliability](https://learn.microsoft.com/en-us/azure/well-architected/reliability/)
+
 ### Database Migrations
 
 - [COMP010.1-sql-migration-scripts] Applications **MUST** have database migrations built-in or use migration tools (Flyway, Liquibase, Alembic)
@@ -402,28 +457,110 @@ Final functional configuration "inside" the application is out of scope.
 
 - [COMP013.2-internal-tls] Internal service-to-service communication **MAY** use mutual TLS if required for compliance
 
-### Health Probes [COMP014-healthchecks]
+### System State Definitions [COMP014-system-states]
 
-Applications **MUST** provide probe endpoints for Kubernetes health management.
+**Applications MUST define and document clear operational states to enable proper monitoring, automated responses, and incident management.**
 
-- [COMP014.1-liveness] **Liveness probe**: Indicates if application is running
-  - Should check critical dependencies
+Based on the Azure Well-Architected Framework Reliability pillar, all applications **MUST** support the following operational states:
+
+- [COMP014.1-state-healthy] **Healthy/Normal**: System operates within expected parameters
+  - All dependencies available
+  - Performance metrics within acceptable ranges
+  - No degraded functionality
+  - Ready to serve production traffic
+
+- [COMP014.2-state-degraded] **Degraded**: Reduced functionality but still operational
+  - Some non-critical features unavailable
+  - Performance reduced but acceptable
+  - Service continues with limitations
+  - May operate with cached data or fallback mechanisms
+
+- [COMP014.3-state-failed] **Failed/Unhealthy**: System not functioning correctly
+  - Critical dependencies unavailable
+  - Cannot serve requests properly
+  - Requires intervention or restart
+  - Should not receive production traffic
+
+- [COMP014.4-state-maintenance] **Maintenance**: Planned downtime
+  - Scheduled updates or repairs
+  - Graceful shutdown of services
+  - Clear communication to users
+  - Documented maintenance windows
+
+- [COMP014.5-state-recovery] **Recovery**: System returning to normal operation
+  - Post-incident recovery phase
+  - Dependencies reconnecting
+  - Caches rebuilding
+  - Gradual return to full capacity
+
+**State Transition Requirements:**
+
+- [COMP014.6-state-transitions] Applications **MUST**:
+  - Document valid state transitions (e.g., Healthy → Degraded → Failed)
+  - Emit events/logs when state changes occur
+  - Expose current state via health endpoints
+  - Support automated decision-making based on state
+
+- [COMP014.7-state-visibility] State information **MUST** be:
+  - Observable via health check endpoints
+  - Logged with structured data
+  - Exposed as metrics (e.g., `app_state{state="healthy"}`)
+  - Included in monitoring dashboards
+
+Reference: [Azure Well-Architected Framework - Reliability](https://learn.microsoft.com/en-us/azure/well-architected/reliability/)
+
+### Health Probes [COMP014A-healthchecks]
+
+Applications **MUST** provide probe endpoints for Kubernetes health management that accurately reflect the system states defined above.
+
+- [COMP014A.1-liveness] **Liveness probe**: Indicates if application is running (maps to Healthy vs Failed states)
+  - Should check critical internal components only
+  - **MUST NOT** fail due to external dependency issues
   - Failure triggers container restart
-  - Recommended: `/health/live` or `/healthz`
+  - Recommended endpoint: `/health/live` or `/healthz`
+  - Example checks: internal process health, deadlock detection, memory leaks
 
-- [COMP014.2-readiness] **Readiness probe**: Indicates if application can serve traffic
-  - Should check all dependencies (database, cache, downstream services)
-  - Failure removes pod from load balancer
-  - Recommended: `/health/ready` or `/readyz`
+- [COMP014A.2-readiness] **Readiness probe**: Indicates if application can serve traffic (maps to Healthy vs Degraded states)
+  - **MUST** check all critical dependencies (database, cache, downstream services)
+  - Failure removes pod from load balancer rotation
+  - Recommended endpoint: `/health/ready` or `/readyz`
+  - Example checks: database connectivity, external API availability, queue connectivity
 
-- [COMP014.3-startup] **Startup probe**: For slow-starting applications
-  - Higher failure threshold and interval
-  - Recommended: `/health/startup` or same as liveness
+- [COMP014A.3-startup] **Startup probe**: For slow-starting applications
+  - Disables liveness/readiness checks during startup
+  - Higher failure threshold and longer interval
+  - Recommended endpoint: `/health/startup` or same as liveness
+  - **MUST** be configured for applications taking >30 seconds to start
 
-- [COMP014.4-probe-performance] Probes **MUST**:
-  - Respond within 1 second
+- [COMP014A.4-probe-performance] Probes **MUST**:
+  - Respond within 1 second (timeout)
   - Not have business logic side-effects
-  - Be lightweight (no heavy database queries)
+  - Be lightweight (no heavy database queries or complex computations)
+  - Return appropriate HTTP status codes (200 = healthy, 503 = unhealthy)
+
+- [COMP014A.5-probe-configuration] Probe configuration **MUST** include:
+  - `initialDelaySeconds`: Time before first probe (typically 10-30s)
+  - `periodSeconds`: How often to probe (typically 10s for liveness, 5s for readiness)
+  - `timeoutSeconds`: Probe timeout (typically 1-3s)
+  - `failureThreshold`: Consecutive failures before action (typically 3)
+  - `successThreshold`: Consecutive successes to be considered healthy (typically 1)
+
+- [COMP014A.6-probe-response] Health probe endpoints **MUST** return:
+  - HTTP 200-299: Healthy/Ready
+  - HTTP 503: Service Unavailable (degraded or failed)
+  - HTTP 500-599: Server error (failed)
+  - Response body **SHOULD** include state details in JSON format:
+    ```json
+    {
+      "status": "healthy",
+      "timestamp": "2025-10-27T12:00:00Z",
+      "checks": {
+        "database": "up",
+        "cache": "up",
+        "downstream_api": "degraded"
+      }
+    }
+    ```
 
 Reference: [Configure Liveness, Readiness and Startup Probes | Kubernetes](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
 
@@ -505,6 +642,97 @@ Metrics enable:
 - Performance optimization
 
 Reference: [Golden Signals for Kubernetes - Sysdig](https://sysdig.com/blog/golden-signals-kubernetes/)
+
+### Alerting [COMP016A-alerting]
+
+**Applications and infrastructure MUST have comprehensive alerting configured to enable proactive problem detection and rapid incident response.**
+
+SSC Hosting configures centralized alerting based on metrics and health states. Applications **MUST** expose appropriate metrics to enable effective alerting.
+
+#### Critical Threshold Alerts
+
+- [COMP016A.1-resource-alerts] **Resource Usage Alerts**: Monitor and alert on resource exhaustion
+  - **CPU Usage**: Alert when >80% sustained for 5+ minutes
+  - **Memory Usage**: Alert when >85% sustained for 5+ minutes
+  - **Disk Space**: Alert when >80% used (persistent volumes)
+  - **Network Saturation**: Alert on packet loss or bandwidth limits
+  
+- [COMP016A.2-response-time-alerts] **Response Time / Latency Alerts**: Monitor request performance
+  - **P95 Latency**: Alert when >1000ms for critical endpoints
+  - **P99 Latency**: Alert when >2000ms for critical endpoints
+  - **Request Duration**: Alert on sudden increases (>2x baseline)
+  - **Slow Queries**: Alert on database queries >5 seconds
+  
+- [COMP016A.3-error-rate-alerts] **Error Rate Alerts**: Monitor application errors
+  - **HTTP 5xx Errors**: Alert when >5% of requests fail (over 5 minutes)
+  - **HTTP 4xx Errors**: Alert when >20% of requests (potential attack or misconfiguration)
+  - **Failed Requests**: Alert on sustained error rates
+  - **Exception Rate**: Alert on uncaught exceptions or critical errors
+  
+- [COMP016A.4-availability-alerts] **Availability / Uptime Alerts**: Monitor service availability
+  - **Pod Availability**: Alert when <minimum required replicas running
+  - **Service Degradation**: Alert on readiness probe failures
+  - **Dependency Failures**: Alert when external dependencies unavailable
+  - **SLA Violations**: Alert when availability drops below SLA threshold (typically 99.9%)
+
+#### Alert Configuration Requirements
+
+- [COMP016A.5-alert-severity] Alerts **MUST** be categorized by severity:
+  - **Critical (P1)**: Immediate action required - service down or major impact
+    - Page on-call engineer immediately
+    - Example: All pods failing, database unreachable, >50% error rate
+  - **High (P2)**: Urgent attention needed - degraded service
+    - Notify team immediately
+    - Example: Single pod failing, elevated error rates, high latency
+  - **Medium (P3)**: Important but not urgent - potential issues
+    - Notify during business hours
+    - Example: Resource usage trending high, intermittent errors
+  - **Low (P4)**: Informational - no immediate action
+    - Create ticket for investigation
+    - Example: Approaching resource limits, minor configuration drift
+
+- [COMP016A.6-alert-routing] Alert routing **MUST** include:
+  - Clear escalation paths
+  - Integration with incident management system
+  - Runbook links for common issues
+  - Automatic ticket creation for non-critical alerts
+
+- [COMP016A.7-alert-quality] To prevent alert fatigue:
+  - Alerts **MUST** be actionable (clear remediation steps)
+  - Alerts **SHOULD NOT** fire for expected events (e.g., planned maintenance)
+  - Alert thresholds **MUST** be tuned to reduce false positives
+  - Alerts **SHOULD** auto-resolve when condition clears
+  - Alert frequency **SHOULD** be limited (group related alerts)
+
+- [COMP016A.8-monitoring-sla] Monitoring and alerting systems **MUST**:
+  - Have their own high availability configuration
+  - Alert delivery time <1 minute for critical alerts
+  - Maintain alert history for trend analysis
+  - Support alert testing and validation
+
+**Example Alert Configuration:**
+```yaml
+alerts:
+  - name: HighErrorRate
+    severity: critical
+    condition: rate(http_requests_total{status=~"5.."}[5m]) > 0.05
+    for: 5m
+    annotations:
+      summary: "High error rate detected"
+      description: "Error rate is {{ $value }}% over last 5 minutes"
+      runbook: "https://wiki.example.com/runbooks/high-error-rate"
+  
+  - name: HighMemoryUsage
+    severity: high
+    condition: container_memory_usage_bytes / container_spec_memory_limit_bytes > 0.85
+    for: 10m
+    annotations:
+      summary: "High memory usage detected"
+      description: "Memory usage at {{ $value }}%"
+      runbook: "https://wiki.example.com/runbooks/memory-issues"
+```
+
+Reference: [Google SRE Book - Monitoring Distributed Systems](https://sre.google/sre-book/monitoring-distributed-systems/)
 
 ### Resource Requirements [COMP017-resource-recommendations]
 
@@ -702,6 +930,141 @@ Deployment requests use a "Deployment Verzoek" form with all relevant deployment
   - Operational runbooks
   - Troubleshooting guides
 
+## Disaster Recovery and Resilience Testing [COMP025-disaster-recovery]
+
+**Regular disaster recovery exercises and resilience testing are critical to ensure systems can recover from failures and meet reliability objectives.**
+
+Based on the Azure Well-Architected Framework Reliability pillar, organizations **MUST** plan, test, and document disaster recovery capabilities.
+
+### Disaster Recovery Planning
+
+- [COMP025.1-recovery-objectives] **Recovery Objectives**: Applications **MUST** define and document:
+  - **RTO (Recovery Time Objective)**: Maximum acceptable downtime
+    - Critical services: RTO ≤ 1 hour
+    - Standard services: RTO ≤ 4 hours
+    - Non-critical services: RTO ≤ 24 hours
+  - **RPO (Recovery Point Objective)**: Maximum acceptable data loss
+    - Critical data: RPO ≤ 15 minutes (continuous backup/replication)
+    - Standard data: RPO ≤ 1 hour
+    - Non-critical data: RPO ≤ 24 hours
+
+- [COMP025.2-dr-plan] **Disaster Recovery Plan**: Each application **MUST** have a documented DR plan including:
+  - Step-by-step recovery procedures
+  - Roles and responsibilities during incident
+  - Communication protocols and escalation paths
+  - Dependency mapping (what must be restored first)
+  - Validation steps to confirm successful recovery
+  - Fallback procedures if recovery fails
+
+- [COMP025.3-backup-strategy] **Backup Strategy**: Applications **MUST** implement appropriate backup mechanisms:
+  - Automated database backups (daily minimum, ideally continuous)
+  - Point-in-time recovery capability for databases
+  - File storage backups (if applicable)
+  - Backup retention policy (typically 30 days minimum)
+  - Backup encryption for sensitive data
+  - Off-site/geo-redundant backup storage
+
+### Backup Testing and Validation
+
+- [COMP025.4-backup-testing] **Backup Verification**: Backups **MUST** be tested regularly:
+  - Automated backup verification (checksum validation)
+  - Monthly restore tests to non-production environment
+  - Quarterly full disaster recovery simulation
+  - Document actual restore times vs. RTO targets
+  - Validate data integrity after restore
+
+- [COMP025.5-restore-procedures] **Restore Procedures**: Applications **MUST** document and test:
+  - Automated restore scripts where possible
+  - Manual restore procedures with step-by-step instructions
+  - Data validation queries to confirm successful restore
+  - Application startup sequence after restore
+  - Smoke tests to verify functionality
+
+### Resilience Testing (Chaos Engineering)
+
+- [COMP025.6-chaos-testing] **Controlled Failure Testing**: Applications **SHOULD** undergo regular resilience testing:
+  - **Pod Failures**: Randomly terminate pods to test self-healing
+  - **Node Failures**: Simulate node crashes to test failover
+  - **Network Latency**: Inject latency to test timeout and retry behavior
+  - **Dependency Failures**: Simulate database or API failures to test circuit breakers
+  - **Resource Exhaustion**: Test behavior under CPU/memory pressure
+  - Start with non-production environments, gradually move to production
+
+- [COMP025.7-chaos-frequency] **Testing Schedule**: Resilience testing **SHOULD** be performed:
+  - Development/Test environments: Weekly
+  - Acceptance environment: Monthly
+  - Production environment: Quarterly (with proper planning and communication)
+  - Game Days: Semi-annual full-scale disaster recovery exercises
+
+- [COMP025.8-failure-injection] **Failure Injection Tools**: Consider using:
+  - Chaos Mesh for Kubernetes
+  - Azure Chaos Studio
+  - Gremlin or similar chaos engineering platforms
+  - Custom scripts for controlled failure scenarios
+
+### Recovery Time Testing
+
+- [COMP025.9-rto-validation] **RTO Validation**: Applications **MUST**:
+  - Measure actual recovery time during DR tests
+  - Compare against documented RTO targets
+  - Identify and optimize slow recovery steps
+  - Update DR documentation with real metrics
+  - Report RTO violations to stakeholders
+
+- [COMP025.10-rpo-validation] **RPO Validation**: Applications **MUST**:
+  - Verify backup frequency meets RPO requirements
+  - Test point-in-time recovery accuracy
+  - Measure data loss during simulated failures
+  - Validate backup completeness and integrity
+
+### Post-Incident Review
+
+- [COMP025.11-post-mortem] **Post-Incident Analysis**: After DR tests or real incidents:
+  - Conduct blameless post-mortem reviews
+  - Document lessons learned
+  - Create action items for improvements
+  - Update runbooks and DR procedures
+  - Share findings with development and operations teams
+  - Track and verify implementation of improvements
+
+### Documentation Requirements
+
+- [COMP025.12-dr-documentation] **DR Documentation MUST** include:
+  - Current RTO and RPO values
+  - Last successful DR test date and results
+  - Backup schedule and retention policy
+  - Restore procedure step-by-step guide
+  - Dependency diagram for recovery sequencing
+  - Contact information for incident response team
+  - Links to monitoring dashboards
+  - Links to runbooks for common scenarios
+
+**Example DR Test Checklist:**
+```
+- [ ] Notify stakeholders of planned DR test
+- [ ] Verify latest backup availability
+- [ ] Take pre-test snapshot of system state
+- [ ] Begin timer for RTO measurement
+- [ ] Simulate failure scenario (e.g., delete database)
+- [ ] Execute recovery procedure
+- [ ] Restore from backup
+- [ ] Validate data integrity
+- [ ] Run smoke tests
+- [ ] Stop timer and record RTO
+- [ ] Document any issues encountered
+- [ ] Review results with team
+- [ ] Update procedures based on findings
+```
+
+**Success Criteria:**
+- Actual RTO ≤ Target RTO
+- Actual RPO ≤ Target RPO  
+- All data restored correctly
+- All services functioning after recovery
+- Zero security vulnerabilities introduced during recovery
+
+Reference: [Azure Well-Architected Framework - Reliability](https://learn.microsoft.com/en-us/azure/well-architected/reliability/)
+
 ## Summary of Compliance Codes
 
 | Code | Requirement | Priority |
@@ -731,6 +1094,11 @@ Deployment requests use a "Deployment Verzoek" form with all relevant deployment
 | COMP022-ibom | Interface documentation | MUST |
 | COMP023-compatibility | Backward compatibility | MUST |
 | COMP024-quality | Code quality and testing | MUST |
+| COMP014-system-states | System state definitions and transitions | MUST |
+| COMP014A-healthchecks | Enhanced health probe configuration | MUST |
+| COMP009A-resilience | Redundancy and fault tolerance | MUST/SHOULD |
+| COMP016A-alerting | Comprehensive alerting on critical thresholds | MUST |
+| COMP025-disaster-recovery | Disaster recovery planning and testing | MUST |
 
 ## References and Further Reading
 
@@ -742,6 +1110,11 @@ Deployment requests use a "Deployment Verzoek" form with all relevant deployment
 **Monitoring and Observability:**
 - [Golden Signals for Kubernetes | Sysdig](https://sysdig.com/blog/golden-signals-kubernetes/)
 - [Google SRE Book - Monitoring Distributed Systems](https://sre.google/sre-book/monitoring-distributed-systems/)
+
+**Reliability and Resilience:**
+- [Azure Well-Architected Framework - Reliability](https://learn.microsoft.com/en-us/azure/well-architected/reliability/)
+- [Kubernetes Health Checks](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/)
+- [Azure Chaos Studio](https://learn.microsoft.com/en-us/azure/chaos-studio/)
 
 **Security:**
 - [OWASP Kubernetes Security Cheat Sheet](https://cheatsheetsecurity.com/resources/kubernetes-security-cheat-sheet/)
