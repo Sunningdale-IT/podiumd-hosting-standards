@@ -1,0 +1,146 @@
+DELIVERY / DEPLOYMENT CONTRACT
+
+Table of Contents
+1. Infrastructure Description
+  1.1 Cloud Resource Provider
+  1.2 AKS Subscriptions
+  1.3 Azure Resources
+  1.4 Open Source Infrastructure Tools
+  1.5 Documentation Platform
+2. Definitions within the Context of Deployment
+3. Which Software We Do / Do Not Place on the Haven Environment
+  3.1 On Haven: Developed from Common Ground
+  3.2 On Haven: Fully Open Source Further Developed in Line with Common Ground
+  3.3 Not on Haven
+4. Connectivity and Integration Components
+5. Making an Application Available to Users
+6. Which Rights You Obtain as a Component Service Provider
+  6.1 Deployment Orchestration via Git Version Control System
+  6.2 Kubernetes API
+7. What We Expect from a Component Service Provider
+  7.1 Qualitative / Maintainable Software
+  7.2 Containers & Software Image
+  7.3 Supply Chain Security Measures
+  7.4 Scalability and Starts / Stops
+  7.5 Helm Charts
+  7.6 Namespaces
+  7.7 100% Automation
+  7.8 Addressing of Components
+  7.9 Deployment Orchestration (Git Version Control System)
+  7.10 When Using an Email Service
+  7.11 Communication Between Components
+  7.12 Communication with Other Municipal Environments
+  7.13 Communication with Third‑Party Services
+  7.14 Database Migrations
+  7.15 Concurrency / Stateless
+  7.16 Configuration / Secrets
+  7.17 Encryption
+  7.18 SBOM (Software Bill of Materials) & IBOM (Interface Bill of Materials)
+  7.19 Probes
+  7.20 Logging
+  7.21 Metrics
+  7.22 Resource Requirements
+  7.23 Release Notes
+  7.24 Documentation & Data Transfer
+  7.25 Backward Compatible
+
+---------------------------------------------
+1. Infrastructure Description
+1.1 Cloud Resource Provider
+We currently use Microsoft Azure Kubernetes Service (AKS). Nevertheless, the municipality must at all times be able to move to an alternative cloud Kubernetes platform. Therefore, alongside the Haven standard we rely on a coherent suite of open‑source management tools and try to be as little dependent as possible on Azure‑specific services. An external market party keeps these management tools up to date, resolves vulnerabilities and by safeguarding coherence we can easily migrate to a newer Kubernetes version.
+
+1.2 AKS Subscriptions
+We use separate Azure subscriptions / resource groups to isolate environments (for example: development, acceptance, production) and to apply least‑privilege access, quota management and cost control. Network segregation, IAM roles and policies are applied uniformly via Infrastructure as Code.
+
+1.3 Azure Resources
+Only generic, cloud‑agnostic Azure resources are used (e.g. Load Balancers, Virtual Networks, Storage, Key Vault for secret storage where needed). We intentionally avoid PaaS lock‑ins unless explicitly agreed (e.g. no proprietary databases unless justified). Migration strategy: any used managed service must have an exit plan (export / backup format, open protocol support).
+
+1.4 Open Source Infra Tools
+Core platform components (e.g. ingress controller, service mesh if applicable, GitOps operator, monitoring stack, logging stack, policy engine) are all open source and version pinned. Upgrades follow a controlled change process with rollback plans. Vulnerability scanning (containers, Helm charts, dependencies) is continuous.
+
+1.5 Documentation Platform
+All platform and component documentation resides in the internal municipal documentation space (e.g. a secured wiki / Git repository). Sensitive configuration details (IPs, keys, network topologies) are only stored internally and never in public repos.
+
+2. Definitions (Deployment Context)
+Component: A deployable logical service (one or more containers) delivering a defined capability. Deployment: Automated rollout of a component version through the GitOps pipeline. Environment: A logical stage (DEV / TEST / ACC / PROD). Release: A packaged, versioned set of artifacts (container images + Helm chart). SBOM / IBOM: Inventories that list respectively software dependencies and externally exposed / consumed interfaces.
+
+3. Which Software Is (Not) Placed on Haven
+3.1 On Haven – Developed from Common Ground
+Custom or municipality‑specific components developed following Common Ground principles (modularity, API first, data ownership at source) are allowed.
+3.2 On Haven – Pure Open Source Evolving in Line with Common Ground
+Mature open source components aligned with Common Ground architectural tenets may be onboarded if they meet security & maintenance criteria.
+3.3 Not on Haven
+Closed source black‑box solutions without adequate transparency, components with vendor lock‑in risk, unsupported or end‑of‑life software, or software failing security / privacy requirements.
+
+4. Connectivity and Integration Components
+All inter‑component communication uses secure, mutually authenticated channels (TLS). External exposure occurs only via the platform ingress layer with central policies (rate limiting, WAF, auditing). Integration patterns: REST/JSON, Async messaging (e.g. queues, events) or other standard open protocols. Direct database access across components is prohibited; only exposed service APIs are used.
+
+5. Making the Application Available to Users
+User access occurs via the designated frontend entrypoints and identity provider (IdP) integrations (Single Sign-On / federated identity). No component may implement ad‑hoc authentication bypassing centralized identity. Rollouts use blue/green or canary strategies where risk warrants.
+
+6. Rights Granted to Component Service Providers
+6.1 Deployment Orchestration via Git Version Control
+Service providers submit changes via pull requests (branch protection, mandatory reviews, automated lint/security checks). Merge to the main branch triggers the GitOps operator which reconciles declared desired state to the cluster.
+6.2 Kubernetes API
+Direct cluster access is restricted. Read / list within the assigned namespace(s) plus create/update only for owned resources through least‑privilege RBAC. No cluster‑admin.
+
+7. Expectations of a Component Service Provider
+7.1 Quality / Maintainability
+Code must be version controlled, peer reviewed, tested (unit, integration where feasible) and free of critical/high vulnerabilities at release time. Dependencies kept current; deprecated APIs removed proactively.
+7.2 Containers & Images
+Images must be minimal (no unnecessary shells/tools), scanned, signed, and reference immutable digests (not mutable tags) in Helm values. Base images regularly refreshed; no running as root unless justified.
+7.3 Supply Chain Security Measures
+Implement SBOM generation, dependency integrity (checksums, signatures), and protect build pipelines (isolated runners, secrets management). Multi‑stage builds to reduce attack surface.
+7.4 Scalability & Starts/Stops
+Components must support horizontal scaling (stateless or externalized state). Startup and shutdown must be graceful; readiness before accepting traffic.
+7.5 Helm Charts
+Helm charts must be parameterized for environment differences (resource limits, endpoints) and follow naming conventions. Validation (helm lint, schema) required.
+7.6 Namespaces
+Each component (or logical suite) runs in isolated namespaces with clear resource quotas and network policies restricting egress/ingress minimally.
+7.7 100% Automation
+No manual post‑deploy steps. Infrastructure, configuration, migrations, and secrets provisioning automated via pipelines.
+7.8 Addressing of Components
+Stable DNS naming scheme (e.g. <component>.<env>.svc.cluster.local internally; externally via controlled subdomains). No hardcoded IP addresses.
+7.9 Deployment Orchestration
+Git is the single source of truth. Drift detection alerts when live state diverges; remediation via commits not kubectl hotfixing (except emergency, then post‑factum commit).
+7.10 Use of an Email Service
+If email is required, use the approved centralized mail relay / service with authenticated API or SMTP over TLS. No direct unmanaged outbound mail from containers.
+7.11 Communication Between Components
+Prefer asynchronous decoupling where latency tolerance exists. Synchronous calls must include timeouts, retries with backoff, and circuit breaking.
+7.12 Communication with Other Municipal Environments
+Cross‑environment data flows require prior security & privacy assessment, explicit whitelisting and encrypted transport.
+7.13 Communication with Third‑Party Services
+Only vetted third‑party endpoints allowed. External calls must handle failure gracefully and avoid leaking sensitive data in logs.
+7.14 Database Migrations
+Migrations versioned, idempotent, automated in the pipeline before application rollout. Backups verified; rollback or forward‑fix strategy documented.
+7.15 Concurrency / Stateless
+Applications must be stateless or explicitly document state handling (session externalization). Concurrency safety assured (no race conditions causing data corruption).
+7.16 Configuration / Secrets
+Configuration via environment variables / config maps; secrets via secret manager or Kubernetes Secrets (encrypted at rest). No secrets in image layers or VCS.
+7.17 Encryption
+Data in transit: TLS 1.2+ enforced. Data at rest: encrypted volumes or managed storage encryption. Sensitive payload fields additionally encrypted if required by policy.
+7.18 SBOM & IBOM
+Each release publishes a machine‑readable SBOM (e.g. CycloneDX) and an interface catalog (IBOM) listing all inbound/outbound APIs, events, queues, topics.
+7.19 Probes
+Liveness, readiness (and startup where needed) probes defined; no business logic side‑effects in probes.
+7.20 Logging
+Structured, centralized logging (JSON). No sensitive personal data unless strictly necessary; retention and masking policies applied.
+7.21 Metrics
+Expose standard metrics (CPU, memory, request latency, error rates, saturation) via Prometheus format. Custom business metrics documented.
+7.22 Resource Requirements
+Helm values include requests/limits for CPU/memory; storage class and IOPS if applicable defined. Capacity planning guidance (baseline + scaling thresholds) provided.
+7.23 Release Notes
+Provide prior to deployment: new features, improvements, fixed bugs/vulnerabilities, breaking changes, external communication impact. Follow Keep a Changelog conventions.
+7.24 Documentation & Data Transfer
+Architecture docs list external services (database, cache, queue, file storage). Environment‑specific docs stored only on the internal designated location. Data transfer between provider and municipality occurs exclusively over secured, municipality‑approved channels.
+7.25 Backward Compatible
+Updates must maintain backward compatibility with other Common Ground components to avoid service disruption, data integrity risks, or blocking further updates.
+
+Appendix / General Principles
+- Least privilege access
+- Auditability of all changes
+- Reproducible builds
+- Open standards first
+- Privacy & security by design
+
+END OF TRANSLATION
