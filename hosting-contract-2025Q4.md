@@ -2,8 +2,8 @@
 
 | Version | Date | Author | Comments |
 |----|----|----|----|----|
-| 2024Q3 | 27/8/2024 | Jim Leitch | SSC | Converted to Markdown |
-| 2025Q4 | 27/10/2025 | SSC/Dimpact | Updated with SRE/DevOps best practices |
+| 2024Q3 | 27/8/2024 | Jim Leitch / SSC | Converted to Markdown |
+| 2025Q4 | 27/10/2025 | SSC/Dimpact | Updated with SRE/DevOps best practices and Cap Gemini reliability recommendations |
 
 ## Executive Summary
 
