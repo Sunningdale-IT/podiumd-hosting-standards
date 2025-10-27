@@ -1,7 +1,7 @@
 # PodiumD Hosting Standards 2025Q4
 
 | Version | Date | Author | Comments |
-|----|----|----|----|----|
+|----|----|----|----|
 | 0.1 | 20/02/2024 | Jim Leitch | Sander vd B, Andrew M |
 | 0.8 | 4/3/2024 | Jim Leitch | Stephan Z, Jesse H, Mahmut C, Petra C |
 | 1.0 | 22/4/2024 | Jim Leitch | SSC/Maykin/Dimpact |
@@ -288,7 +288,7 @@ To help understanding of each area of deployment, development party Maykin Media
 
 Dimpact will provide application URLS for all public facing applications.
 
-Dimpact will liase with gemeentes as to the application addressing used and for crestion of appropriate hostnames and cnames.
+Dimpact will liaise with gemeentes as to the application addressing used and for creation of appropriate hostnames and cnames.
 
 ### Communication Between Components
 
@@ -628,7 +628,7 @@ Deployment requests take the form of a "Deployment Verzoek", a form filled in wi
 
 - Full description of possible output parameters (eg API keys generated at deploy time)
 
-- Dependancies on earlier versions of the application
+- Dependencies on earlier versions of the application
 
 - Storage Requirements
 
