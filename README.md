@@ -17,11 +17,13 @@ The 2025Q4 version includes comprehensive SRE/DevOps/Platform Engineering best p
 
 ## Previous Versions
 
-- [Hosting Contract 2024Q3](hosting-contract-2024Q3.md) - Original comprehensive version
-- [Hosting Contract 2024Q4](hosting-contract-2024Q4.md)
-- [Hosting Contract 2025Q1](hosting-contract-2025Q1.md)
-- [Hosting Contract 2025Q2](hosting-contract-2025Q2.md)
-- [Hosting Contract 2025Q3](hosting-contract-2025Q3.md)
+- [Hosting Contract 2024Q3](hosting-contract-2024Q3.md) - Original comprehensive version (Aug 2024)
+- Hosting Contract 2024Q4 - Placeholder
+- Hosting Contract 2025Q1 - Placeholder
+- Hosting Contract 2025Q2 - Placeholder
+- Hosting Contract 2025Q3 - Placeholder
+
+Note: Versions marked as "Placeholder" have not been published yet. The 2025Q4 version supersedes all previous versions with updated requirements.
 
 ## Compliance Tracking
 
