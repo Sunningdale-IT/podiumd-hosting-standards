@@ -353,8 +353,9 @@ Final functional configuration "inside" the application is out of scope.
 
 Based on the Azure Well-Architected Framework, applications **MUST** be designed to handle failures gracefully and maintain availability.
 
-- [COMP009A.1-multi-zone] **Multi-Zone Deployments**: Production applications **SHOULD** support deployment across Azure Availability Zones
-  - **MUST** be implemented for critical/high-availability applications
+- [COMP009A.1-multi-zone] **Multi-Zone Deployments**: Applications **SHOULD** support deployment across Azure Availability Zones
+  - Critical and high-availability applications (SLA ≥99.9%) **MUST** implement multi-zone deployment
+  - Non-critical applications **MAY** use single-zone deployment with documented risk acceptance
   - Pod anti-affinity rules to spread replicas across zones
   - Topology spread constraints for even distribution
   - Zone-aware persistent storage when needed
@@ -367,13 +368,21 @@ Based on the Azure Well-Architected Framework, applications **MUST** be designed
   - Retry only idempotent operations or use idempotency keys
   - Log retry attempts for debugging
   
-- [COMP009A.3-circuit-breaker] **Circuit Breaker Pattern**: Applications with external dependencies **MUST** implement circuit breakers
-  - Prevent cascading failures from slow/failing dependencies
-  - Three states: Closed (normal), Open (failing), Half-Open (testing recovery)
-  - Configurable failure threshold (e.g., 50% errors over 10 requests)
-  - Configurable timeout before attempting recovery (e.g., 30-60 seconds)
-  - Fallback mechanisms when circuit is open (cached data, degraded functionality)
-  - Examples: Use libraries like Polly (.NET), Resilience4j (Java), PyBreaker (Python)
+- [COMP009A.3-circuit-breaker] **Circuit Breaker Pattern**: Applications **MUST** implement circuit breakers when calling:
+  - Third-party external APIs or services
+  - Other microservices outside the application boundary
+  - Shared platform services (authentication, notification services)
+  - **Note**: Circuit breakers are **RECOMMENDED** but not required for:
+    - Direct database connections (use connection pooling and timeouts instead)
+    - Internal function calls within the same service
+    - File system or object storage operations
+  - Implementation details:
+    - Prevent cascading failures from slow/failing dependencies
+    - Three states: Closed (normal), Open (failing), Half-Open (testing recovery)
+    - Configurable failure threshold (e.g., 50% errors over 10 requests)
+    - Configurable timeout before attempting recovery (e.g., 30-60 seconds)
+    - Fallback mechanisms when circuit is open (cached data, degraded functionality)
+    - Examples: Use libraries like Polly (.NET), Resilience4j (Java), PyBreaker (Python)
 
 - [COMP009A.4-load-balancing] **Load Balancing**: Applications **MUST** support load balancing across multiple instances
   - Minimum 2 replicas for production (3+ recommended)
