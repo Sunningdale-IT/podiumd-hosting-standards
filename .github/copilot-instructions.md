@@ -41,9 +41,9 @@ Documents include a version history table with:
 
 Example format:
 ```markdown
-| Version | Date | Author | Comments |
+| Version | Date | Author | Comments |  |
 |----|----|----|----|----|
-| 0.1 | 20/02/2024 | Author Name | Reviewer Names |
+| 0.1 | 20/02/2024 | Author Name | Reviewer Names |  |
 ```
 
 ### Compliance Codes
