@@ -34,17 +34,63 @@ Applications will be deployed for multiple municipalities across multiple OTAP e
 
 ### Subscriptions / Environments
 
-Each customer/gemeente utilizes a set of Azure Subscriptions - one subscription for each OTAP environment. This simplifies billing and provides security demarcation between environments at customer, supplier and OTAP levels.
+Each customer/gemeente utilizes a set of Azure Subscriptions - one subscription for each OTAP environment. 
 
-Not every customer/supplier requires the full set of OTAP environments.
+**Isolation Benefits:**
+- Simplifies billing and cost allocation
+- Provides security demarcation between environments at customer, supplier and OTAP levels
+- Enables least-privilege access control
+- Supports quota management and cost control
+- Facilitates network segregation
+
+**Uniform Management:**
+- Network segregation applied consistently
+- IAM roles and policies deployed uniformly via Infrastructure as Code
+- Not every customer/supplier requires the full set of OTAP environments
 
 ### Cloud Resource Provider
 
-We currently use **Microsoft Azure** as our cloud platform. However, we **MAY** migrate to alternative cloud platforms in the future. Any deployment efforts should use **open standards** and be as cloud-agnostic as possible to facilitate potential migration to alternative or multi-cloud platforms.
+We currently use **Microsoft Azure** as our cloud platform. However, the municipality **MUST** retain the ability to migrate to alternative cloud platforms at any time. 
+
+**Vendor Lock-in Avoidance Strategy:**
+- Deployment efforts **MUST** use **open standards** and be as cloud-agnostic as possible
+- We intentionally avoid PaaS lock-ins unless explicitly agreed and justified
+- Any managed service used **MUST** have a documented exit plan:
+  - Export/backup format defined
+  - Open protocol support verified
+  - Migration path documented
+- We rely on a coherent suite of **open-source management tools** rather than cloud-specific services
+- Infrastructure as Code (IaC) **SHOULD** be portable across cloud providers where feasible
+
+### Open Source Infrastructure Tools
+
+Core platform components are **open source** and **version pinned** to ensure consistency and control:
+
+- **Ingress Controller** - NGINX or similar open-source ingress
+- **Service Mesh** - (if applicable) Open-source service mesh solutions
+- **GitOps Operator** - ArgoCD, Flux, or similar for declarative deployments
+- **Monitoring Stack** - Prometheus, Grafana for metrics and visualization
+- **Logging Stack** - Open-source log aggregation and analysis
+- **Policy Engine** - OPA (Open Policy Agent) or similar for policy enforcement
+
+**Tool Management:**
+- Upgrades follow a controlled change process with rollback plans
+- Vulnerability scanning (containers, Helm charts, dependencies) is continuous
+- An external market party maintains these management tools, resolves vulnerabilities, and ensures coherence
+- Version upgrades are coordinated to maintain compatibility and enable easy Kubernetes version migration
+
+### Documentation Platform
+
+**All platform and component documentation** resides in the internal municipal documentation space:
+
+- [COMP025-documentation-platform] Documentation **MUST** be stored in secured wiki or Git repository
+- [COMP025.1-sensitive-data] Sensitive configuration details (IPs, keys, network topologies) **MUST** be stored only internally
+- [COMP025.2-no-public-secrets] No sensitive information **MAY** be stored in public repositories
+- [COMP025.3-access-control] Documentation access **MUST** be controlled via role-based access
 
 ### Azure Resources
 
-Current Azure resources in use:
+Only **generic, cloud-agnostic** Azure resources are used:
 
 - **Kubernetes (k8s)** – Azure Kubernetes Service (AKS)
   - Standard AKS with two autoscaling node groups: one for application workloads, another for management workloads
@@ -113,6 +159,38 @@ Acceptance environments are **100% like-for-like with production**: same hardwar
 #### Production
 
 Production environments have maximum uptime, monitoring, and resources.
+
+## Software Placement Criteria
+
+This section defines which software components are permitted on the PodiumD hosting environment ("Haven").
+
+### Permitted Software [COMP026-software-criteria]
+
+#### On Haven: Developed from Common Ground
+
+- [COMP026.1-common-ground-native] Custom or municipality-specific components developed following **Common Ground principles** are permitted:
+  - Modularity and separation of concerns
+  - API-first design
+  - Data ownership at source
+  - Interoperability through standard interfaces
+
+#### On Haven: Open Source Aligned with Common Ground
+
+- [COMP026.2-open-source-aligned] Mature **open-source components** aligned with Common Ground architectural tenets may be onboarded if they meet:
+  - Security requirements (vulnerability scanning, SBOM)
+  - Maintenance criteria (active development, regular updates)
+  - Compatibility with existing platform components
+  - Documentation standards
+
+### Prohibited Software [COMP026.3-prohibited]
+
+The following types of software are **NOT** permitted on Haven:
+
+- **Closed source black-box solutions** without adequate transparency
+- Components with **vendor lock-in risk** or proprietary dependencies
+- **Unsupported or end-of-life software** without active maintenance
+- Software **failing security or privacy requirements**
+- Components incompatible with Common Ground principles
 
 ## What We Expect from Suppliers
 
@@ -212,8 +290,14 @@ PodiumD consists of a suite of sub-applications. The PodiumD version is defined 
 - [COMP003.5-minimal-images] Container images **SHOULD** be minimal (no unnecessary shells/tools)
   - Use distroless or alpine base images where possible
   - Multi-stage builds to reduce attack surface
+  - Regularly refresh base images with security patches
 
 - [COMP003.6-non-root] Containers **MUST NOT** run as root unless explicitly justified and approved
+
+- [COMP003.7-immutable-digests] Production deployments **SHOULD** reference immutable image digests in Helm values
+  - Use SHA256 digests in addition to version tags: `image@sha256:abc123...`
+  - Ensures exact image reproducibility
+  - Prevents tag mutations
 
 ### Timezone [COMP004-timezone]
 
@@ -224,13 +308,33 @@ For logging and monitoring purposes, timezone **MUST** be **UTC**. Default datab
 SSC Hosting scans all containers for vulnerabilities regularly.
 
 - [COMP005.1-scanning] Containers **MUST** be scanned for vulnerabilities by the supplier before delivery
+
 - [COMP005.2-sbom] Each release **MUST** include a Software Bill of Materials (SBOM) in CycloneDX or SPDX format
+  - Machine-readable format required
+  - Include all dependencies with versions
+  - Update SBOM with each release
+
 - [COMP005.3-vulnerability-remediation] Vulnerabilities flagged **MUST** be fixed, mitigated, or receive waiver from system architects (supplier + Dimpact + SSC Hosting) within:
   - Critical: 7 days
   - High: 30 days
   - Medium: 90 days
+
 - [COMP005.4-dependency-updates] Dependencies **SHOULD** be kept current; deprecated APIs removed proactively
+
 - [COMP005.5-signed-images] Container images **SHOULD** be signed using cosign or similar
+  - Enables verification of image provenance
+  - Protects against supply chain tampering
+
+- [COMP005.6-build-integrity] Implement dependency integrity checks:
+  - Checksums for all dependencies
+  - Signature verification where available
+  - Locked dependency versions (no floating versions)
+
+- [COMP005.7-build-pipeline-security] Build pipelines **MUST** be secured:
+  - Isolated build runners
+  - Secrets management (no secrets in code or logs)
+  - Multi-stage builds to reduce attack surface
+  - Audit logging of build activities
 
 **Recommended scanning tools:**
 - Code-level: SonarQube, Snyk
@@ -304,9 +408,49 @@ SSC Hosting scans all containers for vulnerabilities regularly.
 
 ### K8s Namespaces
 
-PodiumD as a whole is deployed in one single **"podiumd"** kubernetes namespace.
+PodiumD as a whole is deployed in one single **"podiumd"** kubernetes namespace for simplified service discovery and communication.
 
-All PodiumD components share this namespace for simplified service discovery and communication.
+**Namespace Isolation Requirements:**
+
+- [COMP028-namespace-isolation] Each component (or logical suite) **MUST** be isolated with proper resource controls:
+  - Clear **resource quotas** defined (CPU, memory, storage limits)
+  - **Network policies** restricting egress/ingress to minimum required
+  - Namespace-level RBAC policies for access control
+  
+- [COMP028.1-resource-quotas] Resource quotas **MUST** prevent resource exhaustion:
+  ```yaml
+  # Example namespace quota
+  resourceQuota:
+    hard:
+      requests.cpu: "10"
+      requests.memory: "20Gi"
+      limits.cpu: "20"
+      limits.memory: "40Gi"
+      persistentvolumeclaims: "10"
+  ```
+
+- [COMP028.2-network-policies] Network policies **MUST** restrict network traffic:
+  - Default deny ingress/egress
+  - Explicit allow rules for required communication
+  - Minimize lateral movement risk
+  
+  ```yaml
+  # Example: Allow only necessary component communication
+  networkPolicy:
+    podSelector:
+      matchLabels:
+        app: open-zaak
+    ingress:
+      - from:
+        - podSelector:
+            matchLabels:
+              app: open-forms
+        ports:
+        - protocol: TCP
+          port: 8000
+  ```
+
+All PodiumD components share the "podiumd" namespace but are subject to these isolation controls.
 
 ### 100% Automation [COMP008-automation]
 
@@ -342,10 +486,23 @@ Final functional configuration "inside" the application is out of scope.
 - [COMP009.2-api-communication] Communication and data transfer **SHOULD** use APIs (RESTful or async messaging)
   - No direct database access between components
   - Use standard protocols (HTTP/REST, gRPC, or message queues)
+  - Integration patterns: REST/JSON, async messaging (queues, events), or other standard open protocols
 
 - [COMP009.3-async-preferred] Asynchronous communication **SHOULD** be preferred where latency tolerance exists
   - Events, message queues for decoupling
-  - Synchronous calls **MUST** include timeouts, retries, circuit breaking
+  - Synchronous calls **MUST** include timeouts, retries with backoff, and circuit breaking
+
+- [COMP009.4-secure-channels] All inter-component communication **MUST** use secure, mutually authenticated channels
+  - TLS for encrypted transport
+  - Mutual authentication where security policy requires
+
+- [COMP009.5-integration-layer] External exposure occurs **only** via the platform ingress layer with central policies:
+  - Rate limiting
+  - Web Application Firewall (WAF)
+  - Auditing and logging
+
+- [COMP009.6-no-direct-db] Direct database access across components is **prohibited**
+  - Only exposed service APIs may be used for inter-component communication
 
 ### Database Migrations
 
@@ -363,6 +520,8 @@ Final functional configuration "inside" the application is out of scope.
 ### Application Concurrency / Statelessness
 
 - [COMP011.1-stateless] Applications **SHOULD** be stateless and commit all data to database
+  - Support horizontal scaling without shared local state
+  - Explicitly document any state handling mechanisms
 
 - [COMP011.2-object-storage] Files **SHOULD** be written to object store (Azure Blob Storage)
 
@@ -373,6 +532,11 @@ Final functional configuration "inside" the application is out of scope.
 - [COMP011.5-permanent-data] Permanent data requiring backup **MUST** be written to file share created outside K8s cluster
 
 - [COMP011.6-session-externalization] Session state **MUST** be externalized (Redis, database, or distributed cache)
+
+- [COMP011.7-concurrency-safety] Applications **MUST** ensure concurrency safety
+  - No race conditions causing data corruption
+  - Proper locking mechanisms for shared resources
+  - Transaction isolation where needed
 
 **File storage preference order:**
 1. Object Storage (Azure Blob)
@@ -387,11 +551,18 @@ Final functional configuration "inside" the application is out of scope.
 
 - [COMP012.3-secrets] Secret/sensitive information **MUST** use K8s secrets store
   - Secrets sourced from Azure Key Vault at deployment time
+  - Kubernetes Secrets encrypted at rest
   - No secrets in code, container images, or version control
 
 - [COMP012.4-secret-rotation] Applications **SHOULD** support secret rotation without restart
+  - Watch for secret changes
+  - Reload credentials dynamically where possible
 
 - [COMP012.5-log-verbosity] Logging verbosity **SHOULD** be controlled by environment variable (e.g., `LOG_LEVEL=DEBUG`)
+
+- [COMP012.6-no-secrets-in-images] No secrets **MAY** be embedded in container image layers or VCS
+  - Scan images for accidentally committed secrets
+  - Use .gitignore and .dockerignore appropriately
 
 ### SSL Certificates [COMP013-ssl]
 
@@ -605,19 +776,28 @@ Release notes **MUST** include:
 
 - [COMP020.1-third-party-services] Communication with third-party services **MUST**:
   - Use only vetted and approved endpoints
-  - Handle failures gracefully
+  - Handle failures gracefully (no cascading failures)
   - Avoid leaking sensitive data in logs
   - Include timeouts and retries
+  - Be explicitly whitelisted in network policies
 
 - [COMP020.2-cross-environment] Cross-environment data flows **MUST**:
   - Have prior security and privacy assessment
-  - Use explicit whitelisting
+  - Use explicit whitelisting (no blanket cross-environment access)
   - Use encrypted transport (TLS 1.2+)
+  - Be documented in architecture diagrams
 
 - [COMP020.3-email-service] Email services **MUST**:
   - Use approved centralized mail relay
   - Use authenticated API or SMTP over TLS
   - No direct unmanaged outbound mail from containers
+
+- [COMP020.4-municipal-environments] Communication with other municipal environments **REQUIRES**:
+  - Prior security assessment
+  - Privacy impact assessment when handling personal data
+  - Explicit network whitelisting
+  - Encrypted channels (TLS 1.2+)
+  - Documented data flows
 
 ### Data Security and Privacy
 
@@ -634,6 +814,23 @@ Release notes **MUST** include:
   - Service accounts with minimal permissions
   - No cluster-admin access
   - RBAC enforced
+
+### User Access and Authentication [COMP027-user-access]
+
+User-facing applications **MUST** follow centralized authentication patterns:
+
+- [COMP027.1-centralized-identity] User access occurs via designated frontend entrypoints and identity provider (IdP) integrations
+  - Single Sign-On (SSO) / federated identity preferred
+  - Azure Entra ID integration where applicable
+  
+- [COMP027.2-no-adhoc-auth] No component **MAY** implement ad-hoc authentication bypassing centralized identity management
+  - Custom authentication requires explicit waiver
+  - Migration plan to centralized identity required for waivers
+
+- [COMP027.3-deployment-strategies] Production rollouts **SHOULD** use risk-appropriate deployment strategies:
+  - **Blue/Green deployments** - Full environment switch for high-risk changes
+  - **Canary deployments** - Gradual traffic shifting for validation
+  - **Rolling updates** - Standard approach for low-risk updates
 
 ### Interface Documentation [COMP022-ibom]
 
@@ -668,39 +865,92 @@ Deployment requests use a "Deployment Verzoek" form with all relevant deployment
 
 ### GitOps Workflow
 
-- Git is the single source of truth
-- Changes via Pull Requests (branch protection, mandatory reviews, automated checks)
-- Merge to main triggers GitOps operator
-- Drift detection alerts when live state diverges
-- Remediation via commits, not manual `kubectl` (except emergencies with post-factum commit)
+- **Git is the single source of truth** for all infrastructure and application configurations
+- **Changes via Pull Requests** with:
+  - Branch protection enabled
+  - Mandatory code reviews
+  - Automated lint and security checks
+  - CI/CD validation before merge
+- **Merge to main triggers GitOps operator** which reconciles declared desired state to the cluster
+- **Drift detection** alerts when live state diverges from Git
+- **Remediation via commits**, not manual `kubectl` changes
+  - Exception: Emergency hotfixes allowed, but **MUST** be followed by post-factum commit
+  - All kubectl changes must be recorded in Git within 24 hours
 
 ### Access Control
 
-- Service providers submit changes via Pull Requests
-- Direct cluster access restricted
-- Read/list within assigned namespace(s)
-- Create/update only for owned resources (least-privilege RBAC)
-- No cluster-admin access
+**Service providers have restricted, controlled access:**
+
+- **Submit changes via Pull Requests** - No direct production changes
+- **Direct cluster access restricted** - Read-only where granted
+- **Namespace-scoped permissions**:
+  - Read/list within assigned namespace(s)
+  - Create/update only for owned resources
+  - Least-privilege RBAC policies enforced
+- **No cluster-admin access** - System-wide changes managed by SSC
+- **Audit logging** - All access and changes logged for compliance
 
 ## Quality and Maintainability
 
 - [COMP024.1-code-quality] Code **MUST** be:
-  - Version controlled
-  - Peer reviewed
-  - Tested (unit, integration)
-  - Free of critical/high vulnerabilities at release
+  - **Version controlled** in Git or equivalent VCS
+  - **Peer reviewed** before merge to main branch
+  - **Tested** (unit tests, integration tests where feasible)
+  - **Free of critical/high vulnerabilities** at release time
+  - **Dependencies kept current**; deprecated APIs removed proactively
 
 - [COMP024.2-testing] Applications **SHOULD** include:
   - Unit tests (>80% coverage for critical paths)
-  - Integration tests
-  - End-to-end smoke tests
+  - Integration tests for component interactions
+  - End-to-end smoke tests for critical workflows
   - Performance tests for critical workflows
+  - Security tests (SAST/DAST where applicable)
 
 - [COMP024.3-documentation] Applications **MUST** provide:
-  - Architecture documentation
-  - Deployment documentation
-  - Operational runbooks
-  - Troubleshooting guides
+  - Architecture documentation (component diagrams, data flows)
+  - Deployment documentation (installation, configuration)
+  - Operational runbooks (common tasks, procedures)
+  - Troubleshooting guides (common issues, resolutions)
+  - API documentation (OpenAPI/Swagger for REST APIs)
+
+## General Principles
+
+The following principles guide all aspects of the PodiumD hosting environment and supplier relationships:
+
+### Security and Privacy by Design
+
+- **Least Privilege Access**: All components, service accounts, and users operate with minimum necessary permissions
+- **Defense in Depth**: Multiple layers of security controls (network, application, data)
+- **Privacy by Default**: Personal data handling follows GDPR and minimization principles
+- **Zero Trust**: No implicit trust; verify all access requests
+
+### Operational Excellence
+
+- **Auditability**: All changes tracked and logged; immutable audit trails
+- **Reproducible Builds**: Build process deterministic and repeatable
+- **Infrastructure as Code**: All infrastructure declarative and version controlled
+- **Automated Testing**: Comprehensive test coverage at all levels
+
+### Open Standards and Portability
+
+- **Open Standards First**: Prefer open protocols and formats over proprietary
+- **Cloud Agnostic**: Minimize vendor lock-in; maintain migration capability
+- **Interoperability**: Components integrate via standard APIs
+- **Open Source Preference**: Leverage and contribute to open source
+
+### Reliability and Resilience
+
+- **Graceful Degradation**: Services degrade gracefully under failure
+- **Automated Recovery**: Self-healing systems where possible
+- **Chaos Engineering**: Proactively test failure scenarios
+- **Observability**: Comprehensive monitoring, logging, and tracing
+
+### Continuous Improvement
+
+- **Feedback Loops**: Regular reviews and retrospectives
+- **Metrics-Driven**: Decisions based on data and measurements
+- **Learning Culture**: Share knowledge and lessons learned
+- **Innovation**: Encourage experimentation within safe boundaries
 
 ## Summary of Compliance Codes
 
@@ -731,6 +981,10 @@ Deployment requests use a "Deployment Verzoek" form with all relevant deployment
 | COMP022-ibom | Interface documentation | MUST |
 | COMP023-compatibility | Backward compatibility | MUST |
 | COMP024-quality | Code quality and testing | MUST |
+| COMP025-documentation-platform | Internal documentation storage | MUST |
+| COMP026-software-criteria | Software placement criteria | MUST |
+| COMP027-user-access | Centralized authentication and deployment strategies | MUST |
+| COMP028-namespace-isolation | Namespace resource quotas and network policies | MUST |
 
 ## References and Further Reading
 
