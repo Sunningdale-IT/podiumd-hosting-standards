@@ -1,12 +1,12 @@
-# Summary of Changes: Cap Gemini Review Integration
+# Summary of Changes: Capgemini Review Integration
 
 **Document:** hosting-contract-2025Q4.md  
 **Date:** October 27, 2025  
-**Review Source:** Bijlage3_translation_EN.txt (Cap Gemini Review)
+**Review Source:** Bijlage3_translation_EN.txt (Capgemini Review)
 
 ## Overview
 
-This document summarizes the changes made to the hosting-contract-2025Q4.md based on recommendations from the Cap Gemini review. The review provided valuable insights into security, operational excellence, and best practices for the PodiumD hosting environment.
+This document summarizes the changes made to the hosting-contract-2025Q4.md based on recommendations from the Capgemini review. The review provided valuable insights into security, operational excellence, and best practices for the PodiumD hosting environment.
 
 ## Major Changes
 
@@ -396,7 +396,7 @@ For existing components:
 
 ## Conclusion
 
-The Cap Gemini review provided valuable recommendations that significantly strengthen the PodiumD hosting standards. The changes enhance security, operational excellence, vendor independence, and compliance while maintaining compatibility with existing components.
+The Capgemini review provided valuable recommendations that significantly strengthen the PodiumD hosting standards. The changes enhance security, operational excellence, vendor independence, and compliance while maintaining compatibility with existing components.
 
 These updates align the hosting contract with industry best practices and Common Ground principles, ensuring a robust, secure, and maintainable platform for Dutch municipalities.
 
