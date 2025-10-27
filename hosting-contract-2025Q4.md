@@ -355,7 +355,10 @@ Based on the Azure Well-Architected Framework, applications **MUST** be designed
 
 - [COMP009A.1-multi-zone] **Multi-Zone Deployments**: Applications **SHOULD** support deployment across Azure Availability Zones
   - Critical and high-availability applications (SLA ≥99.9%) **MUST** implement multi-zone deployment
-  - Non-critical applications **MAY** use single-zone deployment with formal risk assessment and documented management approval
+  - Non-critical applications **MAY** use single-zone deployment if:
+    - Impact analysis documents potential downtime consequences
+    - Mitigation strategies are defined (e.g., faster recovery procedures)
+    - Technical lead and product owner provide written approval
   - Pod anti-affinity rules to spread replicas across zones
   - Topology spread constraints for even distribution
   - Zone-aware persistent storage when needed
@@ -372,7 +375,7 @@ Based on the Azure Well-Architected Framework, applications **MUST** be designed
   - Third-party external APIs or services
   - Other microservices outside the application boundary
   - Shared platform services (authentication, notification services)
-  - Remote object storage services (Azure Blob Storage, Azure Files over network)
+  - Remote object storage services (Azure Blob Storage, Azure Files)
   - **Note**: Circuit breakers are **RECOMMENDED** but not required for:
     - Direct database connections (use connection pooling and timeouts instead)
     - Internal function calls within the same service
